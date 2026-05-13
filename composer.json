@@ -1,0 +1,6 @@
+{
+    "require": {
+        "double-break/spapi-php": "^1.0",
+        "ebay/digital-signature-php-sdk": "^1.0"
+    }
+}

@@ -1,0 +1,33 @@
+{
+    "name": "runz0rd/mapper-php",
+    "description": "Model mapping, unmapping and validation",
+    "keywords": ["library", "php", "object", "mapper", "validator", "traits"],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Milos Pejanovic",
+            "email": "pejan123@gmail.com",
+            "role": "lead"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/runz0rd/mapper-php/issues"
+    },
+    "require": {
+        "runz0rd/common-php": "2.2.*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "~5"
+    },
+    "autoload": {
+        "classmap": [
+            "src/"
+        ]
+    },
+    "autoload-dev": {
+        "classmap": [
+            "tests/"
+        ]
+    }
+}

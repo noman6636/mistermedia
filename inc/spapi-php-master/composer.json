@@ -1,0 +1,21 @@
+{
+  "name": "double-break/spapi-php",
+  "description": "Amazon Selling Partner API Client",
+  "type": "library",
+  "authors": [
+     {
+         "name": "Lyubo Slavilov",
+         "email": "lyubo.slavilov@gmail.com"
+     }
+  ],
+  "require": {
+    "ext-simplexml": "*",
+    "ext-json": "*",
+    "ext-zlib": "*",
+    "guzzlehttp/guzzle": "^7.4",
+    "guzzlehttp/psr7": "^2.1"
+  },
+  "autoload": {
+    "psr-4": { "DoubleBreak\\Spapi\\" : "src/" }
+  }
+}

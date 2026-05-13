@@ -1,0 +1,30 @@
+{
+    "name": "runz0rd/common-php",
+    "description": "My collection of common libraries for php.",
+    "keywords": ["common", "library", "php", "helpers", "utilities"],
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Milos Pejanovic",
+            "email": "pejan123@gmail.com",
+            "role": "lead"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/runz0rd/common-php/issues"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "~5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Common\\": "src/Common/"
+        }
+    },
+    "autoload-dev": {
+        "classmap": [
+            "tests/"
+        ]
+    }
+}
