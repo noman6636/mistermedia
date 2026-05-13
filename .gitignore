@@ -1,4 +1,9 @@
 *.zip
-/items_image
-/logs
-/tmp
+items_image/
+logs/
+/tmp/
+images/
+uploads/
+storage/
+node_modules/
+vendor/
