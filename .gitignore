@@ -1,4 +1,4 @@
 *.zip
-items_image
-logs
-tmp
+/items_image
+/logs
+/tmp
