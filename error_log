@@ -48959,3 +48959,13 @@ Stack trace:
 [30-Jun-2026 12:39:10 UTC] PHP Warning:  mkdir(): Permission denied in /home/mistgzny/public_html/inc/config.php on line 13
 [30-Jun-2026 12:39:10 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 17
 [30-Jun-2026 12:39:10 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 18
+[16-Jul-2026 09:26:53 UTC] PHP Warning:  mkdir(): Permission denied in /home/mistgzny/public_html/inc/config.php on line 116
+[16-Jul-2026 09:26:53 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 120
+[16-Jul-2026 09:26:53 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 121
+[16-Jul-2026 10:30:41 Europe/London] PHP Warning:  Undefined array key "ShipmentTrackingDetails" in /home/mistgzny/public_html/cron.php on line 100
+[16-Jul-2026 10:30:41 Europe/London] PHP Warning:  Trying to access array offset on value of type null in /home/mistgzny/public_html/cron.php on line 100
+[16-Jul-2026 10:30:41 Europe/London] PHP Warning:  Undefined array key "ShipmentTrackingDetails" in /home/mistgzny/public_html/cron.php on line 100
+[16-Jul-2026 10:30:41 Europe/London] PHP Warning:  Trying to access array offset on value of type null in /home/mistgzny/public_html/cron.php on line 100
+[16-Jul-2026 09:48:28 UTC] PHP Warning:  mkdir(): Permission denied in /home/mistgzny/public_html/inc/config.php on line 116
+[16-Jul-2026 09:48:28 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 120
+[16-Jul-2026 09:48:28 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 121

@@ -8,39 +8,6 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 logMessage("CRON started", 'start');
-
-function extractOrderTrackingNumber(array $order)
-{
-    if (!isset($order['TransactionArray']['Transaction'])) {
-        return '';
-    }
-
-    $transactions = $order['TransactionArray']['Transaction'];
-    if (!is_array($transactions)) {
-        return '';
-    }
-
-    // Single transaction shape.
-    if (isset($transactions['ShippingDetails']['ShipmentTrackingDetails']['ShipmentTrackingNumber'])) {
-        $tracking = $transactions['ShippingDetails']['ShipmentTrackingDetails']['ShipmentTrackingNumber'];
-        return is_array($tracking) ? '' : trim((string)$tracking);
-    }
-
-    // Multiple transactions shape.
-    foreach ($transactions as $transaction) {
-        if (isset($transaction['ShippingDetails']['ShipmentTrackingDetails']['ShipmentTrackingNumber'])) {
-            $tracking = $transaction['ShippingDetails']['ShipmentTrackingDetails']['ShipmentTrackingNumber'];
-            if (!is_array($tracking)) {
-                $tracking = trim((string)$tracking);
-                if ($tracking !== '') {
-                    return $tracking;
-                }
-            }
-        }
-    }
-
-    return '';
-}
      
     function getImportOrdersEbay($conn, $accountRow, $siteID, $verb, $CreateTimeFrom, $CreateTimeTo, $userToken, $AccountID, $devID, $appID, $certID, $serverUrl, $compatabilityLevel, $page)
     {
@@ -66,30 +33,22 @@ function extractOrderTrackingNumber(array $order)
             $res = XML2Array($responseXml);
             // echo '$res: <pre>' .print_r($res,true). '</pre>';
             // die;
-            $ack = $res['Ack'] ?? '';
-            if ($ack !== 'Success' && $ack !== 'Warning') {
+            if ($res['Ack'] !== 'Success' && $res['Ack'] !== 'Warning') {
                 $error = isset($res['Errors']['LongMessage']) ? $res['Errors']['LongMessage'] : 'Unknown error';
                 logMessage("eBay API Failure: $error", 'error');
             }
 
-            if ($ack === 'Success' || $ack === 'Warning') {
+            if ($res['Ack'] == 'Success' || $res['Ack'] == 'Warning') {
                 $dd = date('Y-m-d H:i:s');
                 $conn->query("update app_accounts set last_get = '$dd', IsTokenInvalid = '0' WHERE id = '{$accountRow['id']}'");
 
-                $totalEntries = (int)($res['PaginationResult']['TotalNumberOfEntries'] ?? 0);
-                $totalPages = (int)($res['PaginationResult']['TotalNumberOfPages'] ?? 0);
-                $ordersData = $res['OrderArray']['Order'] ?? [];
-
-                if ($totalEntries === 1 && is_array($ordersData) && isset($ordersData['OrderID'])) {
-                    $ordersData = array($ordersData);
+                if ($res['PaginationResult']['TotalNumberOfEntries'] == 1) {
+                    $res['OrderArray']['Order'] = array($res['OrderArray']['Order']);
                 }
 
-                if ($totalEntries > 0 && is_array($ordersData)) {
+                if ($res['PaginationResult']['TotalNumberOfEntries'] > 0) {
                     // echo json_encode($res['OrderArray']['Order']);
-                    foreach ($ordersData as $order) {
-                        if (!is_array($order) || !isset($order['OrderID'])) {
-                            continue;
-                        }
+                    foreach ($res['OrderArray']['Order'] as $order) {
                         $OrderID = $order['OrderID'];
                         $check_order = $conn->query("select * from app_orders where OrderID = '$OrderID'");
                         // echo $OrderID.'<br>';
@@ -122,13 +81,10 @@ function extractOrderTrackingNumber(array $order)
                                 $query .= "PostCode='$PostCode', ";
                                 // $PostCode = $conn->real_escape_string($order['ShippingAddress']['PostalCode']);
                                 
-                                $sellingRecordNo = $conn->real_escape_string((string)($order['ShippingDetails']['SellingManagerSalesRecordNumber'] ?? ''));
-                                $query .= "SellingManagerSalesRecordNumber='$sellingRecordNo', ";
+                                $query .= "SellingManagerSalesRecordNumber='{$order['ShippingDetails']['SellingManagerSalesRecordNumber']}', ";
                                 $query .= "ShippingAddress='$ShippingAddress', ";
-                                $shippingService = $conn->real_escape_string((string)($order['ShippingServiceSelected']['ShippingService'] ?? ''));
-                                $shippingCost = $conn->real_escape_string((string)($order['ShippingServiceSelected']['ShippingServiceCost'] ?? '0'));
-                                $query .= "ShippingService='$shippingService', ";
-                                $query .= "ShippingServiceCost='$shippingCost', ";
+                                $query .= "ShippingService='{$order['ShippingServiceSelected']['ShippingService']}', ";
+                                $query .= "ShippingServiceCost='{$order['ShippingServiceSelected']['ShippingServiceCost']}', ";
 
 
                                 $Condition = $order['TransactionArray']['Transaction']['Item']['ConditionDisplayName'] ?? '';
@@ -141,11 +97,7 @@ function extractOrderTrackingNumber(array $order)
                                 }
 
                                 if (array_key_exists("ShippedTime", $order)) {
-                                    $trackingNumber = extractOrderTrackingNumber($order);
-                                    if ($trackingNumber !== '') {
-                                        $trackingNumber = $conn->real_escape_string($trackingNumber);
-                                        $query .= "ShipmentTrackingNumber='$trackingNumber', ";
-                                    }
+                                    $query .= "ShipmentTrackingNumber='{$order['TransactionArray']['Transaction']['ShippingDetails']['ShipmentTrackingDetails']['ShipmentTrackingNumber']}', ";
                                     $ShippedTime = date('Y-m-d H:i:s', strtotime($order['ShippedTime']));
                                     $query .= "ShippedTime='$ShippedTime', ";
                                     $query .= "IsPrinted='0', ";
@@ -233,15 +185,14 @@ function extractOrderTrackingNumber(array $order)
                         }
                     }
 
-                    if ($totalPages > $page) {
+                    if ($res['PaginationResult']['TotalNumberOfPages'] > $page) {
                         sleep(4);
                         $page += 1;
                         getImportOrdersEbay($conn, $accountRow, $siteID, $verb, $CreateTimeFrom, $CreateTimeTo, $userToken, $AccountID, $devID, $appID, $certID, $serverUrl, $compatabilityLevel, $page);
                     }
                 }
             } else {
-                $errorCode = (int)($res['Errors']['ErrorCode'] ?? 0);
-                if ($errorCode === 931 || $errorCode === 17470 || $errorCode === 841 || $errorCode === 21916013) {
+                if ($res['Errors']['ErrorCode'] == 931 || $res['Errors']['ErrorCode'] == 17470 || $res['Errors']['ErrorCode'] == 841 || $res['Errors']['ErrorCode'] == 21916013) {
                     $conn->query("update app_accounts set IsTokenInvalid = '1' WHERE id = '{$accountRow['id']}'");
                 }
             }
@@ -303,19 +254,8 @@ try {
     $verb = 'CompleteSale';
     $orders = $conn->query("select * from app_orders where IsDispatched = '1' and IsRespond = '0'");
     while ($order = $orders->fetch_assoc()) {
-        $accountRes = $conn->query("select * from app_accounts where id = '{$order['AccountID']}'");
-        if (!$accountRes || $accountRes->num_rows === 0) {
-            logMessage("CompleteSale skipped: account not found for OrderID {$order['OrderID']}", 'error');
-            continue;
-        }
-
-        $account = $accountRes->fetch_assoc();
-        $userToken = trim((string)($account['auth_token'] ?? ''));
-        if ($userToken === '') {
-            logMessage("CompleteSale skipped: empty token for AccountID {$order['AccountID']} OrderID {$order['OrderID']}", 'error');
-            continue;
-        }
-
+        $account = $conn->query("select * from app_accounts where id = '{$order['AccountID']}'")->fetch_assoc();
+        $userToken = $account['auth_token'];
         ///Build the request Xml string
         $requestXmlBody = '<?xml version="1.0" encoding="utf-8" ?>';
         $requestXmlBody .= '<CompleteSaleRequest xmlns="urn:ebay:apis:eBLBaseComponents">';
@@ -330,16 +270,11 @@ try {
         //send the request and get response
         $responseXml = $session->sendHttpRequest($requestXmlBody);
         if (stristr($responseXml, 'HTTP 404') || $responseXml == '') {
-            logMessage("CompleteSale HTTP/empty response for OrderID {$order['OrderID']} AccountID {$order['AccountID']}", 'error');
+            echo '<p>Error sending request</p><br>' . $accountRow['account_username'];
         } else {
             $res = XML2Array($responseXml);
-            $ack = $res['Ack'] ?? '';
-            if ($ack === 'Success' || $ack === 'Warning') {
-                $conn->query("update app_orders set IsRespond = '1' where ID = '{$order['ID']}'");
-            } else {
-                $error = $res['Errors']['LongMessage'] ?? 'Unknown CompleteSale error';
-                logMessage("CompleteSale failed for OrderID {$order['OrderID']}: {$error}", 'error');
-            }
+            // print_r($res);
+            $conn->query("update app_orders set IsRespond = '1' where ID = '{$order['ID']}'");
         }
     }
  

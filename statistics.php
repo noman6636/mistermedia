@@ -1,5 +1,5 @@
 <?php
-exit();
+
 require_once "inc/config.php";
 require_once "inc/functions.php";
 $LIMIT = 10;
