@@ -126,9 +126,9 @@ date_default_timezone_set('Europe/London');
 
 // Database configuration
 $servername = "localhost";
-$username   = "mistgzny_mistermedia";
+$username   = "mistgzny_misterofmediadatauser";
 $database   = "mistgzny_mistermediasolutions";
-$password   = "7W2bi,bD6wF~";
+$password   = "pTjeQQCXHwvDuBK9";
 
 // Establish connection
 $conn = new mysqli($servername, $username, $password, $database);
