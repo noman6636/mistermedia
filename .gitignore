@@ -7,3 +7,5 @@ uploads/
 storage/
 node_modules/
 vendor/
+*.csv
+/error.log

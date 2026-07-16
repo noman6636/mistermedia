@@ -17,17 +17,34 @@ if(!in_array(10, $permissions_allow)){
     exit();
 }
 
+$total_orders = 0;
+$total_order_not_exists = 0;
+
 if(isset($_POST['trackingTable'])){
-    $order_id = $_POST['order_id'];
-    $tracking_id = $_POST['tracking_id'];
+    $order_id = isset($_POST['order_id']) && is_array($_POST['order_id']) ? $_POST['order_id'] : [];
+    $tracking_id = isset($_POST['tracking_id']) && is_array($_POST['tracking_id']) ? $_POST['tracking_id'] : [];
+    $updatedCount = 0;
+    $skippedCount = 0;
     
     foreach($order_id as $k=>$orderid){
-        $tr_id = $tracking_id[$k];
-       $orderid =  preg_replace('/[\x00-\x1F\x7F-\xFF]/', '', $orderid);
+        $tr_id = isset($tracking_id[$k]) ? trim((string)$tracking_id[$k]) : '';
+        $orderid = preg_replace('/[\x00-\x1F\x7F-\xFF]/', '', (string)$orderid);
         $orderid = removeEmoji($conn->real_escape_string($orderid));
-            $conn->query("UPDATE app_orders SET ShipmentTrackingNumber = '$tr_id', isTrackingUpload = '0' WHERE OrderID = '$orderid'");
+
+        // Never overwrite/clear tracking with an empty value from CSV/manual upload.
+        if ($orderid === '' || $tr_id === '') {
+            $skippedCount++;
+            continue;
+        }
+
+        $tr_id = removeEmoji($conn->real_escape_string($tr_id));
+        $conn->query("UPDATE app_orders SET ShipmentTrackingNumber = '$tr_id', isTrackingUpload = '0' WHERE OrderID = '$orderid'");
+        if ($conn->affected_rows > 0) {
+            $updatedCount++;
+        }
     }
-    $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Tracking has been uploaded in system and will be posted soon on eBay.</div></div>';
+
+    $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Tracking updated for '.$updatedCount.' order(s). Skipped '.$skippedCount.' invalid/empty row(s).</div></div>';
     header("location: dispatch_orders.php");
     exit();
 }
@@ -54,8 +71,14 @@ if(isset($_POST['csvUpload'])){
           
             while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                 if(!empty($data[0])){
-                    $orderNo = $data[0];
-                    $order = $conn->query("SELECT * FROM app_orders WHERE OrderID ='$orderNo' AND ShipmentTrackingNumber IS NULL")->num_rows;
+                    $orderNo = removeEmoji($conn->real_escape_string(trim((string)$data[0])));
+                    $trackingNo = isset($data[1]) ? trim((string)$data[1]) : '';
+
+                    if ($trackingNo === '') {
+                        continue;
+                    }
+
+                    $order = $conn->query("SELECT * FROM app_orders WHERE OrderID ='$orderNo' AND (ShipmentTrackingNumber IS NULL OR ShipmentTrackingNumber = '')")->num_rows;
                     // echo '$order: <pre>' .print_r($order,true). '</pre>'; 
                     if($order == 0){
                         $total_order_not_exists += 1;

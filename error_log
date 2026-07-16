@@ -48956,3 +48956,6 @@ Stack trace:
 [16-Mar-2026 18:55:56 UTC] PHP Warning:  mkdir(): Permission denied in /home/mistgzny/public_html/inc/config.php on line 13
 [16-Mar-2026 18:55:56 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 17
 [16-Mar-2026 18:55:56 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 18
+[30-Jun-2026 12:39:10 UTC] PHP Warning:  mkdir(): Permission denied in /home/mistgzny/public_html/inc/config.php on line 13
+[30-Jun-2026 12:39:10 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 17
+[30-Jun-2026 12:39:10 UTC] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in /home/mistgzny/public_html/inc/config.php on line 18

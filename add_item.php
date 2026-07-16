@@ -47,6 +47,7 @@ if(isset($_POST['add_item'])){
     $sku = $conn->real_escape_string($_POST['sku']);
     $description = $conn->real_escape_string($_POST['description']);
     $reference = $conn->real_escape_string($_POST['reference']);
+    $team = $conn->real_escape_string($_POST['team']);
     $item_type = $conn->real_escape_string($_POST['item_type']);
     $qty = $conn->real_escape_string($_POST['qty']);
     $stock_threshold = $conn->real_escape_string($_POST['stock_threshold']);
@@ -106,7 +107,7 @@ if(isset($_POST['add_item'])){
    }
     $st = $price[0];
   
-    $conn->query("insert into app_items set sku = '$sku', name = '$name', price = '$st', image='$file_name', description = '$description', item_type='$item_type', reference = '$reference', packing_size_id = '$packing_size_id', stock_threshold='$stock_threshold', order_threshold='$order_threshold'");
+    $conn->query("insert into app_items set sku = '$sku', name = '$name', price = '$st', image='$file_name', description = '$description', item_type='$item_type', reference = '$reference', team = '$team', packing_size_id = '$packing_size_id', stock_threshold='$stock_threshold', order_threshold='$order_threshold'");
     $item_id = $conn->insert_id;
     $now = date('Y-m-d H:i:s');
     if(!empty($_POST['qty'])){
@@ -136,6 +137,7 @@ if(isset($_POST['edit_item'])){
     $order_threshold = $conn->real_escape_string($_POST['order_threshold']);
     $packing_size_id = $conn->real_escape_string($_POST['packing_size_id']);
     $reference = $conn->real_escape_string($_POST['reference']);
+    $team = $conn->real_escape_string($_POST['team']);
     
     $price = $_POST['price'];
     $name_id = $_POST['name_id'];
@@ -149,7 +151,7 @@ if(isset($_POST['edit_item'])){
         exit();
     }
      $st = $price[0];
-    $conn->query("update app_items set sku = '$sku', name = '$name', price = '$st', description = '$description', item_type='$item_type', reference = '$reference', packing_size_id = '$packing_size_id', stock_threshold='$stock_threshold', order_threshold='$order_threshold' where id = '$editId'");
+    $conn->query("update app_items set sku = '$sku', name = '$name', price = '$st', description = '$description', item_type='$item_type', reference = '$reference', team = '$team', packing_size_id = '$packing_size_id', stock_threshold='$stock_threshold', order_threshold='$order_threshold' where id = '$editId'");
     
     for ($i = 0, $n = count($price); $i < $n; $i++) {
         if(!empty($price[$i])){
@@ -435,6 +437,12 @@ button.btn {
                                                             <input type="text" class="form-control" id="reference" name="reference" value="<?=$item['reference'];?>" placeholder="Reference"/>
                                                         </div>
                                                     </div>
+                                                     <div class="col-lg-6 col-md-12 col-12">
+                                                        <div class="form-group">
+                                                            <label for="reference">Team</label>
+                                                            <input type="text" class="form-control" id="team" name="team" value="<?=$item['team'];?>" placeholder="Team"/>
+                                                        </div>
+                                                    </div>
                                                     <div class="col-lg-4 col-md-6 col-12">
                                                         <div class="form-group">
                                                             <label for="stock_threshold">Stock Threshold</label>
@@ -554,6 +562,12 @@ button.btn {
                                                                 <div class="form-group">
                                                                     <label for="reference">Reference</label>
                                                                     <input type="text" class="form-control" id="reference" name="reference" value="" placeholder="Reference"/>
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-lg-6 col-md-12 col-12">
+                                                                <div class="form-group">
+                                                                    <label for="reference">Team</label>
+                                                                    <input type="text" class="form-control" id="team" name="team" value="" placeholder="Team"/>
                                                                 </div>
                                                             </div>
                                                             <div class="col-lg-4 col-md-6 col-12">

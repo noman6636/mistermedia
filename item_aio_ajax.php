@@ -10,7 +10,7 @@ if(!isset($_POST['sku']) || empty($_POST['sku'])){
     exit();
 }
 $type = '';
-$check_sku_item = $conn->query("SELECT * FROM app_items WHERE sku = '{$_POST['sku']}'");
+$check_sku_item = $conn->query("SELECT * FROM app_items WHERE sku = '{$_POST['sku']}' AND item_type = 1 ");
 $check_sku_packages = $conn->query("SELECT * FROM app_packages WHERE sku = '{$_POST['sku']}'");
 if($check_sku_item->num_rows > 0){
    $type = 'item'; 

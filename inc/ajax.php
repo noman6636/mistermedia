@@ -1,9 +1,40 @@
 <?php
 require_once "config.php";
 require_once "functions.php";
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    exit('Method Not Allowed');
+}
+
+if (!isSameOriginRequest()) {
+    http_response_code(403);
+    exit('Invalid request origin');
+}
+
+// Check if admin is logged in
+if(!isset($_SESSION['admin_id'])){
+    http_response_code(401);
+    exit('Unauthorized');
+}
+
+$sessionFingerprint = $_SESSION['auth_fingerprint'] ?? '';
+if ($sessionFingerprint === '' || !hash_equals($sessionFingerprint, buildSessionFingerprint())) {
+    http_response_code(401);
+    exit('Unauthorized');
+}
+
+$permissions_allow = (isset($permissions_allow) && is_array($permissions_allow)) ? $permissions_allow : [];
+
+function requirePermission(array $permissions_allow, int $permissionId) {
+    if (!in_array($permissionId, $permissions_allow, true)) {
+        http_response_code(403);
+        exit('Forbidden');
+    }
+}
  
 if(isset($_POST['editAddress'])){
     $ID = $_POST['editAddress'];
@@ -129,7 +160,7 @@ if(isset($_POST['transferPayout'])){
 
 if(isset($_GET['postEditAddress'])){
    
-    $editId = $_POST['editId'];
+    $editId = (int)$_POST['editId'];
     $order_item_id = $_POST['order_item_id'];
     $SKU = $_POST['SKU'];
     $QuantityPurchased = $_POST['QuantityPurchased'];
@@ -155,23 +186,26 @@ if(isset($_GET['postEditAddress'])){
 }
 
 if(isset($_POST['inhide_outofstock'])){
-    $id = $_POST['inhide_outofstock'];
-    $val = $_POST['value'];
+    requirePermission($permissions_allow, 15);
+    $id = (int)$_POST['inhide_outofstock'];
+    $val = (int)$_POST['value'];
     $conn->query("update app_items set inhide_outofstock = '$val' where id = '$id'");
     $conn->close();
     echo 'SUCCESS';
 }
 if(isset($_POST['inhide_lowstock'])){
-    $id = $_POST['inhide_lowstock'];
-    $val = $_POST['value'];
+    requirePermission($permissions_allow, 15);
+    $id = (int)$_POST['inhide_lowstock'];
+    $val = (int)$_POST['value'];
     $conn->query("update app_items set inhide_lowstock = '$val' where id = '$id'");
     $conn->close();
     echo 'SUCCESS';
 }
 
 if(isset($_POST['inhide_reorder'])){
-    $id = $_POST['inhide_reorder'];
-    $val = $_POST['value'];
+    requirePermission($permissions_allow, 15);
+    $id = (int)$_POST['inhide_reorder'];
+    $val = (int)$_POST['value'];
     $conn->query("update app_items set inhide_reorder = '$val' where id = '$id'");
     $conn->close();
     echo 'SUCCESS';
@@ -191,8 +225,9 @@ if(isset($_GET['getPrice'])){
 }
 
 if(isset($_POST['updateqty'])){
-    $qty = $_POST['updateqty'];
-    $item_id = $_POST['item_id'];
+    requirePermission($permissions_allow, 15);
+    $qty = (float)$_POST['updateqty'];
+    $item_id = (int)$_POST['item_id'];
     $now = date('Y-m-d H:i:s');
     $today = date('Y-m-d');
     $description = 'Added Stock from ALL IN ONE - ITEM PAGE';
@@ -221,12 +256,14 @@ if(isset($_POST['updateqty'])){
 }
 
 if(isset($_FILES['item_image']) && !empty($_FILES['item_image']['name']) && isset($_POST['item_id'])){
+    requirePermission($permissions_allow, 15);
       $errors= array();
       $file_name = strtotime(date('Y-m-d H:i:s')).$_FILES['item_image']['name'];
       $file_size =$_FILES['item_image']['size'];
       $file_tmp =$_FILES['item_image']['tmp_name'];
       $file_type=$_FILES['item_image']['type'];
-      $file_ext=strtolower(end(explode('.',$_FILES['item_image']['name'])));
+    $nameParts = explode('.', $_FILES['item_image']['name']);
+    $file_ext = strtolower(end($nameParts));
       
       $extensions= array("jpeg","jpg","png", "gif");
       
@@ -248,9 +285,10 @@ if(isset($_FILES['item_image']) && !empty($_FILES['item_image']['name']) && isse
         exit();
       }
       
-      $conn->query("update app_items set image = '$file_name' where id = '{$_POST['item_id']}'");
+    $itemId = (int)$_POST['item_id'];
+    $conn->query("update app_items set image = '$file_name' where id = '$itemId'");
       
-      addSystemLog($conn, 'ITEM UPDATED', "Image updated for item with id (".$_POST['item_id'].")", "");
+    addSystemLog($conn, 'ITEM UPDATED', "Image updated for item with id (".$itemId.")", "");
       $conn->close();
       $data['status'] = "success";
       $data['msg'] = 'https://d-orders.co.uk/items_image/'.$file_name;
@@ -258,6 +296,7 @@ if(isset($_FILES['item_image']) && !empty($_FILES['item_image']['name']) && isse
    }
    
  if(isset($_POST['add_price_tag'])){
+     requirePermission($permissions_allow, 15);
     $name = $conn->real_escape_string($_POST['name']);
     $check_name = $conn->query("select * from app_sellprices_name where name = '$name'");
     if($check_name->num_rows > 0){
@@ -289,7 +328,8 @@ if(isset($_FILES['item_image']) && !empty($_FILES['item_image']['name']) && isse
 }
    
 if(isset($_POST['edit_item'])){
-    $editId = $_POST['edit_item'];
+    requirePermission($permissions_allow, 15);
+    $editId = (int)$_POST['edit_item'];
     $name = $conn->real_escape_string($_POST['name']);
     $sku = $conn->real_escape_string($_POST['sku']);
     $old_sku = $conn->real_escape_string($_POST['old_sku']);

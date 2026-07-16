@@ -10,7 +10,7 @@ use Ebay\DigitalSignature\Signature;
 
 function getKeysEbay($token){
     $curl = curl_init();
-
+ 
     curl_setopt_array($curl, array(
       CURLOPT_URL => 'https://apiz.ebay.com/developer/key_management/v1/signing_key',
       CURLOPT_RETURNTRANSFER => true,
@@ -173,7 +173,7 @@ if(isset($_GET['time'])){
                 }else{
                     $res = array();
                 }
-                 echo '$res: <pre>' .print_r($res,true). '</pre>';
+                
                 if(array_key_exists("payouts",$res)){
                     foreach($res['payouts'] as $payout){
                         
@@ -346,12 +346,18 @@ if(isset($_GET['time'])){
                     o.ID,
                     o.OrderID,
                     o.ShipmentTrackingNumber,
-                    a.auth_token
+                                        a.auth_token,
+                                        a.id AS account_id
                 FROM app_orders o
                 INNER JOIN app_accounts a ON a.id = o.AccountID
                 WHERE o.isTrackingUpload = 0
                   AND o.ShipmentTrackingNumber IS NOT NULL
                   AND o.ShipmentTrackingNumber != ''
+                                    AND a.active = 1
+                                    AND a.account_type = 1
+                                    AND a.auth_token IS NOT NULL
+                                    AND a.auth_token != ''
+                                    AND IFNULL(a.IsTokenInvalid, 0) = 0
                   AND o.ID > $lastId
                 ORDER BY o.ID ASC
                 LIMIT $limit
@@ -395,10 +401,31 @@ if(isset($_GET['time'])){
         
                 if ($response && stripos($response, 'HTTP') === false) {
                     $res = XML2Array($response);
-                    if (!empty($res['Ack']) && $res['Ack'] === 'Success') {
+                    $ack = $res['Ack'] ?? '';
+                    if ($ack === 'Success' || $ack === 'Warning') {
                         $updateOrder->bind_param("i", $order['ID']);
                         $updateOrder->execute();
+                    } else {
+                        $errorCode = '';
+                        $errorMessage = '';
+                        if (isset($res['Errors'])) {
+                            if (isset($res['Errors']['ErrorCode'])) {
+                                $errorCode = (string)$res['Errors']['ErrorCode'];
+                            }
+                            if (isset($res['Errors']['LongMessage'])) {
+                                $errorMessage = (string)$res['Errors']['LongMessage'];
+                            }
+                        }
+
+                        if ($errorCode !== '' && in_array((int)$errorCode, [931, 17470, 841, 21916013], true)) {
+                            $accountId = (int)$order['account_id'];
+                            $conn->query("UPDATE app_accounts SET IsTokenInvalid = '1' WHERE id = '$accountId'");
+                        }
+
+                        logMessage("Tracking upload failed for OrderID {$order['OrderID']} (Account {$order['account_id']}), Ack={$ack}, ErrorCode={$errorCode}, Message={$errorMessage}", 'error');
                     }
+                } else {
+                    logMessage("Tracking upload HTTP/empty response for OrderID {$order['OrderID']} (Account {$order['account_id']})", 'error');
                 }
         
                 $lastId = $order['ID'];

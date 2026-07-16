@@ -1,4 +1,5 @@
 <?php
+exit();
 require_once "inc/config.php";
 require_once "inc/functions.php";
 $LIMIT = 10;
@@ -311,12 +312,24 @@ if (isset($_GET['recover'])) {
                         $outofstock = array();
                         $itemsList = array();
                         
-                        $query = isset($_GET['deleted']) ? 
-                            "SELECT * FROM app_items WHERE deleted = 1 ORDER BY sku ASC" : 
-                            "SELECT * FROM app_items WHERE deleted = 0 ORDER BY sku ASC";
+                        $deleted = isset($_GET['deleted']) ? 1 : 0;
+                        $item_type = isset($_GET['digital']) ? 2 : 1;
+                        
+                        $query = "
+                        SELECT *
+                        FROM app_items
+                        WHERE deleted = '$deleted'
+                        AND item_type = '$item_type'
+                        ORDER BY sku ASC
+                        ";
+
+
+                        // $query = isset($_GET['deleted']) ? 
+                        //     "SELECT * FROM app_items WHERE deleted = 1 ORDER BY sku ASC" : 
+                        //     "SELECT * FROM app_items WHERE deleted = 0 ORDER BY sku ASC";
                             
                         $items = $conn->query($query);
-                        
+          
                         $sn = 0;
                         $today = date('Y-m-d');
                         $total_qty = 0;
@@ -348,12 +361,12 @@ if (isset($_GET['recover'])) {
                                     LIMIT 1
                                 ")->fetch_assoc();
                                 
-                                if (isset($item['item_type']) && $item['item_type'] == 1) {
+                                // if (isset($item['item_type']) && $item['item_type'] == 1) {
                                     $dataStat = json_decode($item['statistics'] ?? '{}', true) ?? array();
                                     $remain_stock = $dataStat['remain_stock'] ?? 0;
                                     $upcoming_stock = $dataStat['upcoming_stock'] ?? 0;
                                     $cost_price = $dataStat['cost_price'] ?? 0;
-                                }
+                                // }
                                 
                                 $total_available_stock_amount += ($remain_stock * $cost_price);
                                 $total_upcoming_stock_amount += ($upcoming_stock * $cost_price);
@@ -374,6 +387,8 @@ if (isset($_GET['recover'])) {
                                 $itemsArray['inhide_reorder'] = $item['inhide_reorder'] ?? 0;
                                 $itemsArray['upcoming'] = $upcoming_stock;
                                 $itemsArray['reference'] = $item['reference'];
+                                $itemsArray['team'] = $item['team'];
+                                $itemsArray['item_type'] = $item['item_type'];
                                 
                                 
                                 $itemsList[] = $itemsArray;
@@ -393,6 +408,7 @@ if (isset($_GET['recover'])) {
                                 }
                             }
                         }
+                        
                         ?>
                         <div class="row mb-3">
 
@@ -563,14 +579,50 @@ if (isset($_GET['recover'])) {
 
                                             <!--<button type="button" class="btn rounded-pill btn-warning waves-effect waves-light" data_type="1" onclick="window.location.href='statistics.php?items_csv=1'">Download Csv</button></td>-->
                                             
-                                            <div class="btn-group" role="group" aria-label="Basic example">
-                                                <button type="button" class="btn btn-warning waves-effect waves-light" data_type="1" onclick="window.location.href='statistics.php?items_csv=1'">Download Csv</button>
-                                                <?php if (isset($_GET['deleted'])) { ?>
-                                                <button type="button" class="btn btn-success waves-effect waves-light" data_type="1" onclick="window.location.href='statistics.php?items=1'">All SKUs</button>
-                                                <?php } else { ?>
-                                                <button type="button" class="btn btn-danger waves-effect waves-light" data_type="1" onclick="window.location.href='statistics.php?items=1&deleted=1'">Deleted SKUs</button>
-                                                <?php } ?>
-                                            </div>
+                                       <div class="btn-group" role="group">
+
+                                            <button type="button"
+                                                class="btn btn-warning"
+                                                onclick="window.location.href='statistics.php?items_csv=1'">
+                                                Download Csv
+                                            </button>
+                                            <?php if(isset($_GET['digital'])){ ?>
+
+                                                <button type="button"
+                                                    class="btn btn-success"
+                                                    onclick="window.location.href='statistics.php?items=1<?= isset($_GET['deleted']) ? '&deleted=1' : '' ?>'">
+                                                    All Products
+                                                </button>
+                                            
+                                            <?php } else { ?>
+                                            
+                                                <button type="button"
+                                                    class="btn btn-info"
+                                                    onclick="window.location.href='statistics.php?items=1&digital=1<?= isset($_GET['deleted']) ? '&deleted=1' : '' ?>'">
+                                                    Digital Products
+                                                </button>
+                                            
+                                            <?php } ?>
+                                        
+                                            <?php if (isset($_GET['deleted'])) { ?>
+                                        
+                                                <button type="button"
+                                                    class="btn btn-success"
+                                                    onclick="window.location.href='statistics.php?items=1<?= isset($_GET['digital']) ? '&digital=1' : ''; ?>'">
+                                                    All SKUs
+                                                </button>
+                                        
+                                            <?php } else { ?>
+                                        
+                                                <button type="button"
+                                                    class="btn btn-danger"
+                                                    onclick="window.location.href='statistics.php?items=1<?= isset($_GET['digital']) ? '&digital=1' : ''; ?>&deleted=1'">
+                                                    Deleted SKUs
+                                                </button>
+                                        
+                                            <?php } ?>
+                                        
+                                        </div>
                                         </div>
                                         
                                         <div class="card-datatable pr-2 pl-2 table-responsive">
@@ -580,6 +632,7 @@ if (isset($_GET['recover'])) {
                                                         <th>Sn</th>
                                                         <th>Image</th>
                                                         <th>SKU</th>
+                                                        <th>team</th>
                                                         <th>Reference</th>
                                                         <th>FBA Price</th>
                                                         <th>VAT</th>
@@ -590,49 +643,50 @@ if (isset($_GET['recover'])) {
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-<?php
-$sn = 0;
-$total_qty = 0;
-$total_amount = 0;
-foreach ($itemsList as $item) {
-    $sn++;
-    $total_qty += $item['qty'];
-    $total_amount += ($item['qty'] * $item['price']);
-?>
-    <tr>
-        <td><?= $sn; ?></td>
-        <td><img src="<?= $item['image'] != '' ? 'items_image/' . $item['image'] : 'https://cdn-icons-png.flaticon.com/128/1829/1829586.png'; ?>" style="width:50px;"></td>
-        <td><?= $item['sku']; ?></td>
-        <td><?=$item['reference']?></td>
-        <td><?= $item['fba_price']; ?></td>
-        <td><?= $item['vat_price']; ?></td>
-        <td><?= $item['price']; ?></td>
-        <td><?= $item['qty']; ?></td>
-        <td><span style="color:green"><a href="manage_purchase.php?item_id=<?= $item['id']; ?>">(<?= $item['upcoming']; ?>)</a></span></td>
-
-        <?php if (in_array(27, $permissions_allow)) { ?>
-        <td style="display: flex;">
-            <a type="button" href="add_item.php?edit=<?= $item['id']; ?>" class="btn btn-primary btn-sm" style="margin-right: 5px;">
-                <img src="https://cdn-icons-png.flaticon.com/128/1827/1827933.png" loading="lazy" alt="Edit " title="Edit " width="20" height="20">
-            </a>
-
-            <?php if ($item['deleted'] == 1) { ?>
-                <a type="button" href="?recover=<?= $item['id']; ?>" class="btn btn-sm">
-                    <img src="https://cdn-icons-png.flaticon.com/128/13386/13386428.png" loading="lazy" alt="Arrows " title="Arrows " width="20" height="20">
-                </a>
-            <?php } else { ?>
-                <a type="button" 
-                   href="?delete=<?= $item['id']; ?>" 
-                   class="btn btn-success btn-sm"
-                   onclick="return confirm('Are you sure you want to delete this item?');">
-                    <img src="https://cdn-icons-png.flaticon.com/128/3405/3405244.png" loading="lazy" alt="Delete " title="Delete " width="21" height="21">
-                </a>
-            <?php } ?>
-        </td>
-        <?php } ?>
-    </tr>
-
-<?php } ?>
+                                                    <?php
+                                                    $sn = 0;
+                                                    $total_qty = 0;
+                                                    $total_amount = 0;
+                                                    foreach ($itemsList as $item) {
+                                                        $sn++;
+                                                        $total_qty += $item['qty'];
+                                                        $total_amount += ($item['qty'] * $item['price']);
+                                                    ?>
+                                                        <tr>
+                                                            <td><?= $sn; ?></td>
+                                                            <td><img src="<?= $item['image'] != '' ? 'items_image/' . $item['image'] : 'https://cdn-icons-png.flaticon.com/128/1829/1829586.png'; ?>" style="width:50px;"></td>
+                                                            <td><?= $item['sku']; ?></td>
+                                                            <td><?=$item['reference']?></td>
+                                                            <td><?=$item['team']?></td>
+                                                            <td><?= $item['fba_price']; ?></td>
+                                                            <td><?= $item['vat_price']; ?></td>
+                                                            <td><?= $item['price']; ?></td>
+                                                            <td><?= $item['qty']; ?></td>
+                                                            <td><span style="color:green"><a href="manage_purchase.php?item_id=<?= $item['id']; ?>">(<?= $item['upcoming']; ?>)</a></span></td>
+                                                    
+                                                            <?php if (in_array(27, $permissions_allow)) { ?>
+                                                            <td style="display: flex;">
+                                                                <a type="button" href="add_item.php?edit=<?= $item['id']; ?>" class="btn btn-primary btn-sm" style="margin-right: 5px;">
+                                                                    <img src="https://cdn-icons-png.flaticon.com/128/1827/1827933.png" loading="lazy" alt="Edit " title="Edit " width="20" height="20">
+                                                                </a>
+                                                    
+                                                                <?php if ($item['deleted'] == 1) { ?>
+                                                                    <a type="button" href="?recover=<?= $item['id']; ?>" class="btn btn-sm">
+                                                                        <img src="https://cdn-icons-png.flaticon.com/128/13386/13386428.png" loading="lazy" alt="Arrows " title="Arrows " width="20" height="20">
+                                                                    </a>
+                                                                <?php } else { ?>
+                                                                    <a type="button" 
+                                                                       href="?delete=<?= $item['id']; ?>" 
+                                                                       class="btn btn-success btn-sm"
+                                                                       onclick="return confirm('Are you sure you want to delete this item?');">
+                                                                        <img src="https://cdn-icons-png.flaticon.com/128/3405/3405244.png" loading="lazy" alt="Delete " title="Delete " width="21" height="21">
+                                                                    </a>
+                                                                <?php } ?>
+                                                            </td>
+                                                            <?php } ?>
+                                                        </tr>
+                                                    
+                                                    <?php } ?>
 
 
                                                 </tbody>

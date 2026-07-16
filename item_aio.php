@@ -256,7 +256,7 @@ img {
             
             <div class="col-12" style="height: calc(100vh - 200px);overflow: scroll;">
                 <table width="100%" id="item_sku"  class="table table-bordered">
-                    <?php $items = $conn->query("SELECT * FROM (select sku, image from app_items where deleted = 0 UNION SELECT sku, '' as image from app_packages where deleted = 0 && id < 1) A WHERE sku != ''order by sku ASC");
+                    <?php $items = $conn->query("SELECT * FROM (select sku, image from app_items where deleted = 0  AND item_type = 1 UNION SELECT sku, '' as image from app_packages where deleted = 0 && id < 1) A WHERE sku != ''order by sku ASC");
                            while($item = $items->fetch_assoc()){
                            $sku = $item['sku'];?>
                                                                                      

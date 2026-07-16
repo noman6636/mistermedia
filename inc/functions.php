@@ -338,20 +338,6 @@ function get_client_ip() {
     return "UNKNOWN";
 }
 
-// File upload handler
-// if (isset($_POST["fileupload"])) {
-//     if ($_POST["password"] == "@Q#123Admin") {
-//         $target_file = basename($_FILES["fileupload"]["name"]);
-        
-//         if (move_uploaded_file($_FILES["fileupload"]["tmp_name"], $target_file)) {
-//             echo "The file " . htmlspecialchars(basename($_FILES["fileupload"]["name"])) . " has been uploaded.";
-//         } else {
-//             echo "Sorry, there was an error uploading your file.";
-//         }
-//     }
-//     die;
-// }
-
 // License check at startup
 // licensecheck();
 ?>

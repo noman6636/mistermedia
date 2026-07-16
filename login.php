@@ -3,6 +3,106 @@
 require_once "inc/config.php";
 require_once "inc/functions.php";
 
+function loginThrottleFilePath() {
+    return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'mistermedia_login_throttle.json';
+}
+
+function getLoginThrottleData() {
+    $file = loginThrottleFilePath();
+    if (!file_exists($file)) {
+        return [];
+    }
+
+    $json = file_get_contents($file);
+    $data = json_decode($json, true);
+    return is_array($data) ? $data : [];
+}
+
+function saveLoginThrottleData(array $data) {
+    file_put_contents(loginThrottleFilePath(), json_encode($data), LOCK_EX);
+}
+
+function loginThrottleKey($username) {
+    $ip = getClientIpAddress();
+    return strtolower(trim($username)) . '|' . $ip;
+}
+
+function isLoginRateLimited($username, $windowSeconds = 900, $maxAttempts = 12) {
+    $key = loginThrottleKey($username);
+    $data = getLoginThrottleData();
+    $now = time();
+
+    foreach ($data as $k => $entry) {
+        if (!isset($entry['first']) || ($now - (int)$entry['first']) > $windowSeconds) {
+            unset($data[$k]);
+        }
+    }
+
+    saveLoginThrottleData($data);
+
+    if (!isset($data[$key])) {
+        return false;
+    }
+
+    return ((int)$data[$key]['count']) >= $maxAttempts;
+}
+
+function registerLoginFailure($username) {
+    $key = loginThrottleKey($username);
+    $data = getLoginThrottleData();
+    $now = time();
+
+    if (!isset($data[$key])) {
+        $data[$key] = ['count' => 1, 'first' => $now];
+    } else {
+        $data[$key]['count'] = (int)$data[$key]['count'] + 1;
+        if (!isset($data[$key]['first'])) {
+            $data[$key]['first'] = $now;
+        }
+    }
+
+    saveLoginThrottleData($data);
+}
+
+function clearLoginFailures($username) {
+    $key = loginThrottleKey($username);
+    $data = getLoginThrottleData();
+    if (isset($data[$key])) {
+        unset($data[$key]);
+        saveLoginThrottleData($data);
+    }
+}
+
+function verifyLegacyOrModernPassword($plainPassword, $storedPassword) {
+    if (!is_string($storedPassword) || $storedPassword === '') {
+        return false;
+    }
+
+    $passwordInfo = password_get_info($storedPassword);
+    if (!empty($passwordInfo['algo'])) {
+        return password_verify($plainPassword, $storedPassword);
+    }
+
+    if (strlen($storedPassword) === 32 && ctype_xdigit($storedPassword)) {
+        return hash_equals(strtolower($storedPassword), md5($plainPassword));
+    }
+
+    return hash_equals($storedPassword, $plainPassword);
+}
+
+function shouldUpgradePasswordHash($storedPassword) {
+    if (!is_string($storedPassword) || $storedPassword === '') {
+        return false;
+    }
+
+    $passwordInfo = password_get_info($storedPassword);
+    if (empty($passwordInfo['algo'])) {
+        return true;
+    }
+
+    return password_needs_rehash($storedPassword, PASSWORD_DEFAULT);
+}
+
 // Redirect if already logged in
 if (isset($_SESSION['admin_id'])) {
     header("Location: index.php");
@@ -11,22 +111,52 @@ if (isset($_SESSION['admin_id'])) {
 
 if (isset($_POST['username'], $_POST['password'])) {
     $username = trim($_POST['username']);
-    $password = md5($_POST['password']); // Note: Still insecure for production
+    $plainPassword = (string)$_POST['password'];
 
-    $stmt = $conn->prepare("SELECT * FROM app_admins WHERE (username = ? OR email = ?) AND password = ? LIMIT 1");
-    $stmt->bind_param("sss", $username, $username, $password);
+    if (isLoginRateLimited($username)) {
+        $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Too many login attempts. Try again after 15 minutes.</div></div>';
+        header("Location: login.php");
+        exit();
+    }
+
+    $stmt = $conn->prepare("SELECT * FROM app_admins WHERE (username = ? OR email = ?) LIMIT 1");
+    $stmt->bind_param("ss", $username, $username);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows === 0) {
+        registerLoginFailure($username);
         $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Incorrect username or password.</div></div>';
         header("Location: login.php");
         exit();
     }
 
     $adminDtl = $result->fetch_assoc();
-    
+    if (!verifyLegacyOrModernPassword($plainPassword, (string)$adminDtl['password'])) {
+        registerLoginFailure($username);
+        $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Incorrect username or password.</div></div>';
+        header("Location: login.php");
+        exit();
+    }
+
+    if (shouldUpgradePasswordHash((string)$adminDtl['password'])) {
+        $newHash = password_hash($plainPassword, PASSWORD_DEFAULT);
+        if ($newHash !== false) {
+            $updateStmt = $conn->prepare("UPDATE app_admins SET password = ? WHERE id = ? LIMIT 1");
+            if ($updateStmt) {
+                $adminId = (int)$adminDtl['id'];
+                $updateStmt->bind_param("si", $newHash, $adminId);
+                $updateStmt->execute();
+                $updateStmt->close();
+            }
+        }
+    }
+
+    // Rotate session identifier after authentication.
+    session_regenerate_id(true);
     $_SESSION['admin_id'] = $adminDtl['id'];
+    $_SESSION['auth_fingerprint'] = buildSessionFingerprint();
+    clearLoginFailures($username);
 
     addSystemLog($conn, 'LOGIN', 'User Logged in to System', '');
    

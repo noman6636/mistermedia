@@ -1,7 +1,110 @@
 <?php
 // Start output buffering at the very beginning
 ob_start();
-session_start();
+
+function getClientIpAddress() {
+    return $_SERVER['REMOTE_ADDR'] ?? '';
+}
+
+function getIpNetworkHint($ipAddress) {
+    if ($ipAddress === '') {
+        return '';
+    }
+
+    if (filter_var($ipAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        $parts = explode('.', $ipAddress);
+        if (count($parts) === 4) {
+            return $parts[0] . '.' . $parts[1] . '.' . $parts[2];
+        }
+    }
+
+    if (filter_var($ipAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+        $parts = explode(':', $ipAddress);
+        return implode(':', array_slice($parts, 0, 4));
+    }
+
+    return $ipAddress;
+}
+
+function buildSessionFingerprint() {
+    $ip = getClientIpAddress();
+    $ipHint = getIpNetworkHint($ip);
+    $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    return hash('sha256', $ipHint . '|' . $userAgent);
+}
+
+function isSameOriginRequest() {
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    if ($host === '') {
+        return false;
+    }
+
+    $originHost = '';
+    if (!empty($_SERVER['HTTP_ORIGIN'])) {
+        $originHost = parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST) ?: '';
+    } elseif (!empty($_SERVER['HTTP_REFERER'])) {
+        $originHost = parse_url($_SERVER['HTTP_REFERER'], PHP_URL_HOST) ?: '';
+    }
+
+    if ($originHost === '') {
+        return false;
+    }
+
+    return strcasecmp($host, $originHost) === 0;
+}
+
+function enforceAuthenticatedSessionIntegrity() {
+    if (!isset($_SESSION['admin_id'])) {
+        return;
+    }
+
+    $currentFingerprint = buildSessionFingerprint();
+    if (!isset($_SESSION['auth_fingerprint'])) {
+        $_SESSION['auth_fingerprint'] = $currentFingerprint;
+        return;
+    }
+
+    if (!hash_equals($_SESSION['auth_fingerprint'], $currentFingerprint)) {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+    }
+}
+
+// Enforce safer PHP session behavior before starting the session.
+ini_set('session.use_strict_mode', '1');
+ini_set('session.use_only_cookies', '1');
+ini_set('session.cookie_httponly', '1');
+
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+if (PHP_VERSION_ID >= 70300) {
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+} else {
+    ini_set('session.cookie_secure', $isHttps ? '1' : '0');
+}
+
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+
+if (!headers_sent()) {
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: same-origin');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+}
+
+enforceAuthenticatedSessionIntegrity();
+
 // Configure error reporting
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '1');
