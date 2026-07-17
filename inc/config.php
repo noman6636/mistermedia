@@ -33,6 +33,19 @@ function buildSessionFingerprint() {
     return hash('sha256', $ipHint . '|' . $userAgent);
 }
 
+function destroyCurrentSession() {
+    $_SESSION = [];
+    if (ini_get('session.use_cookies')) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+    }
+    session_destroy();
+}
+
+function getAdminPasswordVersion($passwordHash) {
+    return hash('sha256', (string)$passwordHash);
+}
+
 function isSameOriginRequest() {
     $host = $_SERVER['HTTP_HOST'] ?? '';
     if ($host === '') {
@@ -65,12 +78,7 @@ function enforceAuthenticatedSessionIntegrity() {
     }
 
     if (!hash_equals($_SESSION['auth_fingerprint'], $currentFingerprint)) {
-        $_SESSION = [];
-        if (ini_get('session.use_cookies')) {
-            $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
-        }
-        session_destroy();
+        destroyCurrentSession();
     }
 }
 
@@ -151,6 +159,15 @@ if (isset($_SESSION['admin_id'])) {
 
     if ($adminResult && $adminResult->num_rows > 0) {
         $admin = $adminResult->fetch_assoc();
+
+        $dbPasswordVersion = getAdminPasswordVersion($admin['password'] ?? '');
+        if (!isset($_SESSION['admin_auth_version'])) {
+            $_SESSION['admin_auth_version'] = $dbPasswordVersion;
+        } elseif (!hash_equals((string)$_SESSION['admin_auth_version'], $dbPasswordVersion)) {
+            destroyCurrentSession();
+            header("location: login.php");
+            exit();
+        }
 
         if (!empty($admin['role_id'])) {
             $roleId = intval($admin['role_id']);

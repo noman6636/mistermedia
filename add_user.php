@@ -6,7 +6,7 @@ if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
 }
 
-if($admin['role_id'] != 1){
+if(!$admin || (int)$admin['role_id'] !== 1){
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Access denied to this page.</div></div>';
     header("location: index.php");
     exit();
@@ -16,7 +16,13 @@ if($admin['role_id'] != 1){
 if(isset($_POST['add_user'])){
     $username = $conn->real_escape_string($_POST['username']);
     $email = $conn->real_escape_string($_POST['email']);
-    $password = md5($_POST['password']);
+    $plainPassword = (string)$_POST['password'];
+    $password = password_hash($plainPassword, PASSWORD_DEFAULT);
+    if ($password === false) {
+        $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Unable to secure password right now. Please try again.</div></div>';
+        header("location: add_user.php");
+        exit();
+    }
     $role_id = $conn->real_escape_string($_POST['role_id']);
     
     
@@ -63,8 +69,11 @@ if(isset($_POST['edit_user'])){
     
     $conn->query("update app_admins set username = '$username', email = '$email', role_id = '$role_id' where id = '$editId'");
     if(!empty($_POST['password'])){
-        $password = md5($_POST['password']);
-        $conn->query("update app_admins set password = '$password' where id = '$editId'");
+        $plainPassword = (string)$_POST['password'];
+        $password = password_hash($plainPassword, PASSWORD_DEFAULT);
+        if ($password !== false) {
+            $conn->query("update app_admins set password = '$password' where id = '$editId'");
+        }
     }
     
     addSystemLog($conn, 'USER UPDATED', "User ($username) with id ($editId) has been updated", "");

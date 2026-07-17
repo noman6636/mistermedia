@@ -132,6 +132,7 @@ if (isset($_POST['username'], $_POST['password'])) {
     }
 
     $adminDtl = $result->fetch_assoc();
+    $effectivePasswordHash = (string)$adminDtl['password'];
     if (!verifyLegacyOrModernPassword($plainPassword, (string)$adminDtl['password'])) {
         registerLoginFailure($username);
         $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Incorrect username or password.</div></div>';
@@ -148,6 +149,7 @@ if (isset($_POST['username'], $_POST['password'])) {
                 $updateStmt->bind_param("si", $newHash, $adminId);
                 $updateStmt->execute();
                 $updateStmt->close();
+                $effectivePasswordHash = $newHash;
             }
         }
     }
@@ -156,6 +158,7 @@ if (isset($_POST['username'], $_POST['password'])) {
     session_regenerate_id(true);
     $_SESSION['admin_id'] = $adminDtl['id'];
     $_SESSION['auth_fingerprint'] = buildSessionFingerprint();
+    $_SESSION['admin_auth_version'] = getAdminPasswordVersion($effectivePasswordHash);
     clearLoginFailures($username);
 
     addSystemLog($conn, 'LOGIN', 'User Logged in to System', '');
