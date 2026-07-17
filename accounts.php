@@ -448,7 +448,7 @@ if(isset($_POST['payout_to_payment'])){
                                                     <?php if($account['account_type']==1){ ?>
                                                         <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/EBay_logo.svg/2560px-EBay_logo.svg.png" style="width: 50px;" />
                                                     <?php }else if($account['account_type']==2 || $account['account_type']==3){ ?>
-                                                        <img src="https://d-orders.co.uk/assets/d-orders_logo.png" style="width: 50px;" />
+                                                        <img src="assets/d-orders_logo.png" style="width: 50px;" />
                                                     <?php }else{ ?>
                                                         <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Amazon_logo.svg/2560px-Amazon_logo.svg.png" style="width: 50px;" />
                                                         

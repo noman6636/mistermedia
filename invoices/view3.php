@@ -101,7 +101,7 @@ if(isset($_GET['id'])){
                 height: 240px;
               }
 		/*.body {*/
-            /*background-image:  url(https://d-orders.co.uk/latterheads/dchannel_latterhead.png);*/
+            /*background-image:  url(/latterheads/dchannel_latterhead.png);*/
            /* background-size:   cover;                      /* <------ */
             /*background-repeat: no-repeat;*/
            /* background-position: top right;            /* optionally, center the image 
@@ -118,7 +118,7 @@ if(isset($_GET['id'])){
 </head>
 <body style="padding:0px" class="body">
     <header>
-        <img src="https://d-orders.co.uk/latterheads/paktools_header.png" style="height: auto;width: -webkit-fill-available;">
+        <img src="/latterheads/paktools_header.png" style="height: auto;width: -webkit-fill-available;">
     </header>
     <div class="" style="">
         <div style="padding:5px;padding-left: 40px;padding-right: 40px;">
@@ -184,7 +184,7 @@ if(isset($_GET['id'])){
             
         </div>
         <footer>
-            <img src="https://d-orders.co.uk/latterheads/paktools_footer.png" style="height: auto;width: -webkit-fill-available;">
+            <img src="/latterheads/paktools_footer.png" style="height: auto;width: -webkit-fill-available;">
         </footer>
         
    

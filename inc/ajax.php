@@ -290,8 +290,10 @@ if(isset($_FILES['item_image']) && !empty($_FILES['item_image']['name']) && isse
       
     addSystemLog($conn, 'ITEM UPDATED', "Image updated for item with id (".$itemId.")", "");
       $conn->close();
-      $data['status'] = "success";
-      $data['msg'] = 'https://d-orders.co.uk/items_image/'.$file_name;
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+    $host = $_SERVER['HTTP_HOST'] ?? 'mistermediasolution.com';
+    $data['status'] = "success";
+    $data['msg'] = $scheme . $host . '/items_image/' . $file_name;
       echo json_encode($data);
    }
    

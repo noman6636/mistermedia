@@ -186,7 +186,7 @@ if($check_sku_item->num_rows > 0){
                                                         <div class="row">
                                                             <div class="col-12">
                                                                 <center>
-                                                                    <?php if($item['image']!=''){ ?><img id="image_view" src="items_image/<?=$item['image'];?>" style="width:70%;" /> <?php }else{ ?> <img id="image_view" src="https://d-orders.co.uk/items_image/54818317.png" style="width:70%;" />  <?php } ?>
+                                                                    <?php if($item['image']!=''){ ?><img id="image_view" src="items_image/<?=$item['image'];?>" style="width:70%;" /> <?php }else{ ?> <img id="image_view" src="items_image/54818317.png" style="width:70%;" />  <?php } ?>
                                                                 </center>
                                                                 
                                                             </div>
