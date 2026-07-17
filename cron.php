@@ -4,6 +4,8 @@ require_once "inc/functions.php";
 require_once('inc/Keys.php');
 require_once('inc/eBaySession.php');
 
+enforceCronAccess($conn);
+
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);

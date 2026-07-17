@@ -20,7 +20,25 @@ if(!isset($_GET['account_id']) || !isset($_GET['folder'])){
     exit();
 }
 
-$account = $conn->query("SELECT * FROM app_accounts WHERE id = '{$_GET['account_id']}'")->fetch_assoc();
+$accountId = (int)$_GET['account_id'];
+$folder = (int)$_GET['folder'];
+
+if ($accountId <= 0 || !in_array($folder, array(0, 1), true)) {
+    header("location: index.php");
+    exit();
+}
+
+$stmt = $conn->prepare("SELECT * FROM app_accounts WHERE id = ?");
+$stmt->bind_param("i", $accountId);
+$stmt->execute();
+$account = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$account) {
+    $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Account not found.</div></div>';
+    header("location: index.php");
+    exit();
+}
 
 
 ?>
@@ -116,13 +134,13 @@ $account = $conn->query("SELECT * FROM app_accounts WHERE id = '{$_GET['account_
                             <input id="labeltype" value="1" type="hidden" name="deleteEntries" />
                             <div class="card">
                                 <div class="card-header border-bottom">
-                                    <h4 class="card-title"><?=$account['account_name'];?></h4>
+                                    <h4 class="card-title"><?= htmlspecialchars($account['account_name'], ENT_QUOTES, 'UTF-8'); ?></h4>
                                     <div>
                                         <?php 
-                                        if($_GET['folder']==1){ ?>
-                                            <a class="btn-icon btn btn-primary btn-round btn-sm waves-effect waves-float waves-light" href="?account_id=<?=$_GET['account_id'];?>&folder=0" >Inbox Box</a>
+                                        if($folder==1){ ?>
+                                            <a class="btn-icon btn btn-primary btn-round btn-sm waves-effect waves-float waves-light" href="?account_id=<?=$accountId;?>&folder=0" >Inbox Box</a>
                                        <?php }else{  ?>
-                                            <a class="btn-icon btn btn-primary btn-round btn-sm waves-effect waves-float waves-light" href="?account_id=<?=$_GET['account_id'];?>&folder=1" >Sent Box</a>
+                                            <a class="btn-icon btn btn-primary btn-round btn-sm waves-effect waves-float waves-light" href="?account_id=<?=$accountId;?>&folder=1" >Sent Box</a>
                                       <?php  }
                                         ?>
                                     </div>
@@ -139,36 +157,36 @@ $account = $conn->query("SELECT * FROM app_accounts WHERE id = '{$_GET['account_
                                         <thead>
                                             <tr>
                                                 <th>Sn</th>
-                                                <?php if($_GET['folder']==0){ ?><th>From</th><?php } ?>
-                                                <?php if($_GET['folder']==1){ ?><th>To</th><?php } ?>
+                                                <?php if($folder==0){ ?><th>From</th><?php } ?>
+                                                <?php if($folder==1){ ?><th>To</th><?php } ?>
                                                 <th>Subject</th>
                                                 <th>Date</th>
                                             </tr>
                                         </thead> 
                                         <tbody>
                                         <?php 
-                                            if($_GET['folder']==1){
-                                                $messages = $conn->query("SELECT * FROM app_messages WHERE AccountID = '{$_GET['account_id']}' && Folder = 1 Order By ReceiveDate desc");
-                                            }else{
-                                                $messages = $conn->query("SELECT * FROM app_messages WHERE AccountID = '{$_GET['account_id']}' && Folder = 0 Order By ReceiveDate desc");
-                                            }
+                                            $stmt = $conn->prepare("SELECT * FROM app_messages WHERE AccountID = ? AND Folder = ? ORDER BY ReceiveDate DESC");
+                                            $stmt->bind_param("ii", $accountId, $folder);
+                                            $stmt->execute();
+                                            $messages = $stmt->get_result();
                                         
                                         $sn = 0;
                                         
                                         while($message = $messages->fetch_assoc()){
                                             $sn++; ?>
                                             
-                                    	    <tr style="<?php if($message['ReadStatus']==0){ echo 'font-weight:bold;color:black'; } ?>" onclick="window.location.href='view_message.php?MessageID=<?php echo $message['MessageID']; ?>&account_id=<?=$_GET['account_id'];?>'"  class="tr-hover">
+                                    	    <tr style="<?php if($message['ReadStatus']==0){ echo 'font-weight:bold;color:black'; } ?>" onclick="window.location.href='view_message.php?MessageID=<?= urlencode($message['MessageID']); ?>&account_id=<?=$accountId;?>'"  class="tr-hover">
                                                 <td><?=$sn; ?></td>
-                                                <?php if($_GET['folder']==0){ ?><td><?php echo $message['Sender']; ?></td></th><?php } ?>
-                                                <?php if($_GET['folder']==1){ ?><td><?php echo $message['SendToName']; ?></td></th><?php } ?>
-                                                <td><?php echo $message['Subject']; ?></td>
+                                                <?php if($folder==0){ ?><td><?php echo htmlspecialchars($message['Sender'], ENT_QUOTES, 'UTF-8'); ?></td></th><?php } ?>
+                                                <?php if($folder==1){ ?><td><?php echo htmlspecialchars($message['SendToName'], ENT_QUOTES, 'UTF-8'); ?></td></th><?php } ?>
+                                                <td><?php echo htmlspecialchars($message['Subject'], ENT_QUOTES, 'UTF-8'); ?></td>
                                                 <td><?php echo date('F j, Y', strtotime($message['ReceiveDate'])); ?></td>
                                                 
                                                
                                             </tr>
                                             
-                                        <?php } ?>
+                                        <?php }
+                                        $stmt->close(); ?>
                                         </tbody>
                                     </table>
                                 </div>

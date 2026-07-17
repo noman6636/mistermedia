@@ -2,6 +2,8 @@
 require_once "inc/config.php";
 require_once "inc/functions.php";
 
+enforceCronAccess($conn);
+
 
 $CreateTimeFrom = date("Y-m-d H:i:s",time()-3600*48); //current time minus 30 minutes
 $CreateTimeTo = date("Y-m-d H:i:s",time()+3600*48);

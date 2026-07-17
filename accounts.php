@@ -12,41 +12,60 @@ if(!in_array(2, $permissions_allow)){
     exit();
 }
 
-
-if(isset($_GET['deactive'])){
-$deactive = $_GET['deactive'];
-$conn->query("update app_accounts set active = 0 where id = '$deactive'");
-addSystemLog($conn, 'ACCOUNT DEACTIVE', "Account id $deactive has been deactivated", $deactive);
-$_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account deactivated Successfully.</div></div>';
-header("location: accounts.php");
-exit();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    enforceCsrfOrAbort('accounts.php');
 }
 
-if(isset($_GET['restore'])){
-$restore = $_GET['restore'];
-$conn->query("update app_accounts set deleted = 0 where id = '$restore'");
-addSystemLog($conn, 'ACCOUNT RESTORE', "Account id $restore has been restored", $restore);
-$_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account Restored Successfully.</div></div>';
-header("location: accounts.php?deleted=1");
-exit();
-}
 
-if(isset($_GET['delete'])){
-$delete_id = $_GET['delete'];
-$conn->query("update app_accounts set active = 0, deleted = '1' where id = '$delete_id'");
-addSystemLog($conn, 'ACCOUNT DELETE', "Account id $delete_id has been deleted", $delete_id);
-$_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account deleted Successfully.</div></div>';
-header("location: accounts.php");
-exit();
-}
+if(isset($_POST['account_action'], $_POST['account_id'])){
+    $accountAction = trim((string)$_POST['account_action']);
+    $accountActionId = (int)$_POST['account_id'];
 
-if(isset($_GET['active'])){
-$active = $_GET['active'];
-$conn->query("update app_accounts set active = 1 where id = '$active'");
-addSystemLog($conn, 'ACCOUNT ACTIVE', "Account id $active has been activated", $active);
-$_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account activated Successfully.</div></div>';
-header("location: accounts.php");
-exit();
+    if ($accountActionId > 0) {
+        if ($accountAction === 'deactive') {
+            $stmt = $conn->prepare("UPDATE app_accounts SET active = 0 WHERE id = ?");
+            $stmt->bind_param("i", $accountActionId);
+            $stmt->execute();
+            $stmt->close();
+            addSystemLog($conn, 'ACCOUNT DEACTIVE', "Account id $accountActionId has been deactivated", $accountActionId);
+            $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account deactivated Successfully.</div></div>';
+            header("location: accounts.php");
+            exit();
+        }
+
+        if ($accountAction === 'restore') {
+            $stmt = $conn->prepare("UPDATE app_accounts SET deleted = 0 WHERE id = ?");
+            $stmt->bind_param("i", $accountActionId);
+            $stmt->execute();
+            $stmt->close();
+            addSystemLog($conn, 'ACCOUNT RESTORE', "Account id $accountActionId has been restored", $accountActionId);
+            $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account Restored Successfully.</div></div>';
+            header("location: accounts.php?deleted=1");
+            exit();
+        }
+
+        if ($accountAction === 'delete') {
+            $stmt = $conn->prepare("UPDATE app_accounts SET active = 0, deleted = '1' WHERE id = ?");
+            $stmt->bind_param("i", $accountActionId);
+            $stmt->execute();
+            $stmt->close();
+            addSystemLog($conn, 'ACCOUNT DELETE', "Account id $accountActionId has been deleted", $accountActionId);
+            $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account deleted Successfully.</div></div>';
+            header("location: accounts.php");
+            exit();
+        }
+
+        if ($accountAction === 'active') {
+            $stmt = $conn->prepare("UPDATE app_accounts SET active = 1 WHERE id = ?");
+            $stmt->bind_param("i", $accountActionId);
+            $stmt->execute();
+            $stmt->close();
+            addSystemLog($conn, 'ACCOUNT ACTIVE', "Account id $accountActionId has been activated", $accountActionId);
+            $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Account activated Successfully.</div></div>';
+            header("location: accounts.php");
+            exit();
+        }
+    }
 }
 
 if(isset($_POST['edit'])){
@@ -60,7 +79,7 @@ if(isset($_POST['edit'])){
     $amount_threshold = $conn->real_escape_string($_POST['amount_threshold']);
     $price_tag = $conn->real_escape_string($_POST['price_tag']);
     
-    $check_name = $conn->query("Select * from app_accounts where account_name = '$name' && id <> $editId")->num_rows;
+    $check_name = $conn->query("Select * from app_accounts where account_name = '$account_name' && id <> $editId")->num_rows;
     
     if($check_name > 0){
         $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Account Name already exists.</div></div>';
@@ -367,7 +386,12 @@ if(isset($_POST['payout_to_payment'])){
                                                 
                                                 <td>
                                                     
-                                                    <a type="button" href="?restore=<?php echo $account['id']; ?>" class="btn btn-primary btn-xs btn-sm waves-effect waves-float waves-light">Restore Account</a>
+                                                    <form action="" method="post" style="display:inline-block;">
+                                                        <?= csrfInput(); ?>
+                                                        <input type="hidden" name="account_action" value="restore">
+                                                        <input type="hidden" name="account_id" value="<?php echo (int)$account['id']; ?>">
+                                                        <button type="submit" class="btn btn-primary btn-xs btn-sm waves-effect waves-float waves-light">Restore Account</button>
+                                                    </form>
                                                 </td>
                                             </tr>
                                             
@@ -441,11 +465,26 @@ if(isset($_POST['payout_to_payment'])){
                                                     
                                                     <button type="button" onclick="transferPayout(<?php echo $account['id']; ?>, 'manual', 1);" class="btn btn-primary btn-xs btn-sm waves-effect waves-float waves-light">Transfer Payout</button>
                                                     <?php if($account['active']==1){ ?>
-                                                        <a type="button" href="?deactive=<?php echo $account['id']; ?>" class="btn btn-warning btn-xs btn-sm waves-effect waves-float waves-light">Deactive</a>
+                                                        <form action="" method="post" style="display:inline-block;">
+                                                            <?= csrfInput(); ?>
+                                                            <input type="hidden" name="account_action" value="deactive">
+                                                            <input type="hidden" name="account_id" value="<?php echo (int)$account['id']; ?>">
+                                                            <button type="submit" class="btn btn-warning btn-xs btn-sm waves-effect waves-float waves-light">Deactive</button>
+                                                        </form>
                                                     <?php }else{ ?>
-                                                        <a type="button" href="?active=<?php echo $account['id']; ?>" class="btn btn-success btn-xs btn-sm waves-effect waves-float waves-light">Active</a>
+                                                        <form action="" method="post" style="display:inline-block;">
+                                                            <?= csrfInput(); ?>
+                                                            <input type="hidden" name="account_action" value="active">
+                                                            <input type="hidden" name="account_id" value="<?php echo (int)$account['id']; ?>">
+                                                            <button type="submit" class="btn btn-success btn-xs btn-sm waves-effect waves-float waves-light">Active</button>
+                                                        </form>
                                                     <?php } ?>
-                                                    <a type="button" href="?delete=<?php echo $account['id']; ?>" class="btn btn-danger btn-xs btn-sm waves-effect waves-float waves-light">Delete</a>
+                                                    <form action="" method="post" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this account?');">
+                                                        <?= csrfInput(); ?>
+                                                        <input type="hidden" name="account_action" value="delete">
+                                                        <input type="hidden" name="account_id" value="<?php echo (int)$account['id']; ?>">
+                                                        <button type="submit" class="btn btn-danger btn-xs btn-sm waves-effect waves-float waves-light">Delete</button>
+                                                    </form>
                                                 </td>
                                             </tr>
                                             <? /*<div class="modal fade text-left" id="editForm<?php echo $sn; ?>" tabindex="-1" role="dialog" aria-labelledby="myModalLabel33" aria-hidden="true">
@@ -553,6 +592,7 @@ if(isset($_POST['payout_to_payment'])){
                                     </button>
                                 </div>
                                 <form action=""method="post" id="transferPayoutForm">
+                                    <?= csrfInput(); ?>
                                     <input type="hidden" name="accountId" value="" id="accountId"/>
                                     <div class="modal-body" id="transferPayoutInputs">
                                         

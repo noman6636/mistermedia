@@ -6,16 +6,23 @@ if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
 }
 
-if($admin['role_id'] != 1){
+if(!$admin || (int)$admin['role_id'] !== 1){
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Access denied to this page.</div></div>';
     header("location: index.php");
     exit();
 }
 
-if(isset($_GET['delete'])){
-$delId = $_GET['delete'];
-if($delId != 1){
-    $conn->query("DELETE FROM app_admins where id = '$delId'");
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    enforceCsrfOrAbort('users.php');
+}
+
+if(isset($_POST['delete_user'])){
+$delId = (int)$_POST['delete_user'];
+if($delId > 1){
+    $stmt = $conn->prepare("DELETE FROM app_admins where id = ?");
+    $stmt->bind_param("i", $delId);
+    $stmt->execute();
+    $stmt->close();
     addSystemLog($conn, 'USER DELETE', "User with id ($delId) has been deleted", "");
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">User deleted successfully.</div></div>';
 }
@@ -213,10 +220,11 @@ exit();
                                                 <td data-label="Action">
                                                     <?php if($admin['id']!=1) { ?>
                                                         <a href="add_user.php?edit=<?php echo $admin['id']; ?>" class="btn btn-primary btn-sm">Edit</a>
-                                                        <a href="?delete=<?php echo $admin['id']; ?>" class="btn btn-danger btn-sm"
-                                                           onclick="return confirm('All users with this assigned role will be also deleted');">
-                                                           Delete
-                                                        </a>
+                                                        <form action="" method="post" style="display:inline-block;" onsubmit="return confirm('All users with this assigned role will be also deleted');">
+                                                            <?= csrfInput(); ?>
+                                                            <input type="hidden" name="delete_user" value="<?php echo (int)$admin['id']; ?>">
+                                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                                        </form>
                                                     <?php } else { ?>
                                                         No Action
                                                     <?php } ?>

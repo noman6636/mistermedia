@@ -13,12 +13,21 @@ if(!in_array(21, $permissions_allow)){
     exit();
 }
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    enforceCsrfOrAbort('suppliers.php');
+}
 
-if(isset($_GET['delete'])){
-$delId = $_GET['delete'];
-$conn->query("DELETE FROM app_suppliers where id = '$delId'");
-addSystemLog($conn, 'SUPPLIER DELETE', "Supplier with id ($delId) has been deleted", "");
-$_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Supplier Deleted Successfully.</div></div>';
+
+if(isset($_POST['delete_supplier'])){
+$delId = (int)$_POST['delete_supplier'];
+if ($delId > 0) {
+    $stmt = $conn->prepare("DELETE FROM app_suppliers where id = ?");
+    $stmt->bind_param("i", $delId);
+    $stmt->execute();
+    $stmt->close();
+    addSystemLog($conn, 'SUPPLIER DELETE', "Supplier with id ($delId) has been deleted", "");
+    $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Supplier Deleted Successfully.</div></div>';
+}
 header("location: suppliers.php");
 exit();
 }
@@ -294,7 +303,11 @@ exit();
                                                 <td data-label="Address"><?php echo $supplier['address']; ?>,<br><?php echo $supplier['city']; ?>, <?php echo $supplier['country']; ?></td>
                                                 <td>
                                                     <a type="button" href="add_supplier.php?edit=<?php echo $supplier['id']; ?>" class="btn btn-primary">Edit</a>
-                                                    <a type="button" href="?delete=<?php echo $supplier['id']; ?>" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this account. All Purchased and Stocks will also deleted from that supplier.');">Delete</a>
+                                                    <form action="" method="post" style="display:inline-block;" onsubmit="return confirm('Are you sure you want to delete this account. All Purchased and Stocks will also deleted from that supplier.');">
+                                                        <?= csrfInput(); ?>
+                                                        <input type="hidden" name="delete_supplier" value="<?php echo (int)$supplier['id']; ?>">
+                                                        <button type="submit" class="btn btn-danger">Delete</button>
+                                                    </form>
                                                 </td>
                                             </tr>
                                             

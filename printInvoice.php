@@ -6,7 +6,30 @@ if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
 }
 
-$account = $conn->query("select * from app_accounts where id = '{$_GET['account_id']}'")->fetch_assoc();
+$accountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;
+$frmTs = isset($_GET['frmdate']) ? strtotime((string)$_GET['frmdate']) : false;
+$toTs = isset($_GET['todate']) ? strtotime((string)$_GET['todate']) : false;
+
+if ($accountId <= 0 || $frmTs === false || $toTs === false) {
+  header("location: index.php");
+  exit();
+}
+
+$frmDate = date('Y-m-d', $frmTs);
+$toDate = date('Y-m-d', $toTs);
+
+$stmt = $conn->prepare("SELECT * FROM app_accounts WHERE id = ? LIMIT 1");
+$stmt->bind_param("i", $accountId);
+$stmt->execute();
+$account = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$account) {
+  header("location: index.php");
+  exit();
+}
+
+$invoiceCode = $accountId . '-' . date('mdY', $frmTs) . date('mdY', $toTs);
 ?>
 <!DOCTYPE html>
 <html>
@@ -14,7 +37,7 @@ $account = $conn->query("select * from app_accounts where id = '{$_GET['account_
     <!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">-->
   <!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>-->
   <!--<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>-->
-	<title>Invoice # <?=$_GET['account_id'].'-'.date('mdY', strtotime($_GET['frmdate'])).date('mdY', strtotime($_GET['todate']));?></title>
+  <title>Invoice # <?=htmlspecialchars($invoiceCode, ENT_QUOTES, 'UTF-8');?></title>
 
 
 	<style>
@@ -25,7 +48,7 @@ $account = $conn->query("select * from app_accounts where id = '{$_GET['account_
 		 body { font-size:12px; }
 		 p { margin: 0; /* line-height: 17px; */ }
 		table { width: 100%;border-collapse:collapse;top: 1.2in; }
-		th { border: 1px solid black !important; padding: 5px; font-size:9px;color:#fff !important; background:#000 !important;transition: none !important; -webkit-print-color-adjust: exact; text-align:center; }
+    th { border: 1px solid black !important; padding: 5px; font-size:9px;color:#fff !important; background:#000 !important;transition: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; text-align:center; }
 		
 		td { text-align: left; vertical-align: center; border: 1px solid black;border-bottom: 1px solid;padding:5px;}
 		 
@@ -34,7 +57,7 @@ $account = $conn->query("select * from app_accounts where id = '{$_GET['account_
          .for p{padding-top:0 !important;padding-bottom:0 !important;font-size:10px; border: 1px solid;}
          .totalAmount{
              text-align:right;
-             border: 1px solid black; padding: 5px; font-size:12px;color:black; background:#cacaca;transition: none !important; -webkit-print-color-adjust: exact;
+             border: 1px solid black; padding: 5px; font-size:12px;color:black; background:#cacaca;transition: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
          }
         @media print {
 		th { 
@@ -45,7 +68,7 @@ $account = $conn->query("select * from app_accounts where id = '{$_GET['account_
             background: #000 !important; }
 		.totalAmount{
              text-align:right;
-             border: 1px solid black; padding: 5px; font-size:12px;color:black; background:#cacaca;transition: none !important; -webkit-print-color-adjust: exact;
+             border: 1px solid black; padding: 5px; font-size:12px;color:black; background:#cacaca;transition: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact;
          }
 		}
 		@page {
@@ -102,15 +125,15 @@ $account = $conn->query("select * from app_accounts where id = '{$_GET['account_
     <header>
         <img src="assets/inv logo.png" style="height: 80px;width: 150px;">
     </header>
-    <div class="" style="">
+    <div>
         <div style="padding:5px;padding-left: 40px;padding-right: 40px;">
              <span class="for" style="float:left;">
-                <h6 class="text-center shadowhead">Invoice # <?=$_GET['account_id'].'-'.date('mdY', strtotime($_GET['frmdate'])).date('mdY', strtotime($_GET['todate']));?></h6>
+                 <h6 class="text-center shadowhead">Invoice # <?=htmlspecialchars($invoiceCode, ENT_QUOTES, 'UTF-8');?></h6>
                  <p>
-                     <span><b>Name: </b> <?=$account['account_name'];?></span><br>
-                     <span><b>Phone: </b> <?=$account['phone'];?></span><br>
-                     <span><b>Email: </b> <?=$account['email'];?></span><br>
-                     <span><b>Address: </b> <?=$account['address'];?></span><br>
+                   <span><b>Name: </b> <?=htmlspecialchars((string)$account['account_name'], ENT_QUOTES, 'UTF-8');?></span><br>
+                   <span><b>Phone: </b> <?=htmlspecialchars((string)$account['phone'], ENT_QUOTES, 'UTF-8');?></span><br>
+                   <span><b>Email: </b> <?=htmlspecialchars((string)$account['email'], ENT_QUOTES, 'UTF-8');?></span><br>
+                   <span><b>Address: </b> <?=htmlspecialchars((string)$account['address'], ENT_QUOTES, 'UTF-8');?></span><br>
                 </p>
             </span>
             <br><br>
@@ -135,8 +158,16 @@ $account = $conn->query("select * from app_accounts where id = '{$_GET['account_
         	        $sn=0;
         	        $total = 0;
         	        $totalqty = 0;
-        	        $totalShippingCost = $conn->query("SELECT IFNULL(SUM(ShippingServiceCost), 0) amount FROM app_orders WHERE  IsArchived = '0' && AccountID = '{$_GET['account_id']}' && DATE(CreatedTime) >= '{$_GET['frmdate']}' && DATE(CreatedTime) <= '{$_GET['todate']}'")->fetch_assoc()['amount'];
-        	        $orders = $conn->query("select * from app_order_items a, app_orders b where b.AccountID = '{$_GET['account_id']}' and DATE(b.CreatedTime) >= '{$_GET['frmdate']}' and DATE(b.CreatedTime) <= '{$_GET['todate']}' && b.IsArchived = '0' && b.OrderID = a.OrderID order by b.CreatedTime asc");
+                  $stmt = $conn->prepare("SELECT IFNULL(SUM(ShippingServiceCost), 0) amount FROM app_orders WHERE IsArchived = '0' AND AccountID = ? AND DATE(CreatedTime) >= ? AND DATE(CreatedTime) <= ?");
+                  $stmt->bind_param("iss", $accountId, $frmDate, $toDate);
+                  $stmt->execute();
+                  $totalShippingCost = $stmt->get_result()->fetch_assoc()['amount'];
+                  $stmt->close();
+
+                  $stmt = $conn->prepare("SELECT * FROM app_order_items a, app_orders b WHERE b.AccountID = ? AND DATE(b.CreatedTime) >= ? AND DATE(b.CreatedTime) <= ? AND b.IsArchived = '0' AND b.OrderID = a.OrderID ORDER BY b.CreatedTime ASC");
+                  $stmt->bind_param("iss", $accountId, $frmDate, $toDate);
+                  $stmt->execute();
+                  $orders = $stmt->get_result();
         	        while($order = $orders->fetch_assoc()){
         	            $totalqty += $order['QuantityPurchased'];
         	            $total +=($order['QuantityPurchased']*$order['Price']);
@@ -171,6 +202,7 @@ $account = $conn->query("select * from app_accounts where id = '{$_GET['account_
         	            <td class="totalAmount">'.round($total+$totalShippingCost, 2).'</td>
         	            </tr>';
         	        }
+                  $stmt->close();
         	        
         	        
         	        ?>

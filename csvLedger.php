@@ -6,20 +6,45 @@ if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
 }
 
-    $account = $conn->query("select * from app_accounts where id = '{$_GET['account_id']}'")->fetch_assoc();
+$accountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;
+$ledgerType = isset($_GET['type']) ? (int)$_GET['type'] : 1;
+$frmTs = isset($_GET['frmdate']) ? strtotime((string)$_GET['frmdate']) : false;
+$toTs = isset($_GET['todate']) ? strtotime((string)$_GET['todate']) : false;
+
+if ($accountId <= 0 || !in_array($ledgerType, array(1, 2), true) || $frmTs === false || $toTs === false) {
+    header("location: index.php");
+    exit();
+}
+
+$frmDateInput = date('Y-m-d', $frmTs);
+$toDateInput = date('Y-m-d', $toTs);
+
+$stmt = $conn->prepare("SELECT * FROM app_accounts WHERE id = ? LIMIT 1");
+$stmt->bind_param("i", $accountId);
+$stmt->execute();
+$account = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$account) {
+    header("location: index.php");
+    exit();
+}
+
+$safeAccountName = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string)$account['account_name']);
+
     $header_row = array("Sn", "Date", "Narration", "Sent To", "Debit", "Credit", "Balance");
-    $csvName = $account['account_name'].'_'.date('Y-m-d', strtotime($_GET['frmdate'])).'_'.date('Y-m-d', strtotime($_GET['todate'])).'.csv';
+    $csvName = $safeAccountName.'_'.$frmDateInput.'_'.$toDateInput.'.csv';
     header('Content-Type: application/csv');
     header('Content-Disposition: attachment; filename="'.$csvName.'";');
     $output = fopen('php://output', 'w');
     fputcsv($output,$header_row);
     
-    if($_GET['type']==1){
-        $frmDate = date('Y-m-d', strtotime($_GET['frmdate']));
-    $toDate = date('Y-m-d', strtotime($_GET['todate']));
+    if($ledgerType==1){
+        $frmDate = $frmDateInput;
+    $toDate = $toDateInput;
     $previousOrderAmount = $conn->query("SELECT IFNULL(SUM(a.QuantityPurchased*a.Price), 0) amount FROM app_order_items a, app_orders b WHERE b.OrderID = a.OrderID && DATE(b.CreatedTime) < '$frmDate' && b.IsArchived = '0' && b.AccountID = '{$account['id']}'")->fetch_assoc()['amount'];
     $previousShippingCost = $conn->query("SELECT IFNULL(SUM(ShippingServiceCost), 0) amount FROM app_orders WHERE DATE(CreatedTime) < '$frmDate' &&  IsArchived = '0' && AccountID = '{$account['id']}'")->fetch_assoc()['amount'];
-    $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '{$_GET['account_id']}'  and status = 100 and type = 1")->fetch_assoc()['amount']+0;
+    $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '$accountId'  and status = 100 and type = 1")->fetch_assoc()['amount']+0;
     $openBalance = ($previousOrderAmount+$previousShippingCost)-$previousPaymentAmount;
     $openbalacne_row = array("1", "Opening Balance", "", "", "", "", round($openBalance, 2));
     fputcsv($output,$openbalacne_row);
@@ -42,7 +67,7 @@ if(!isset($_SESSION['admin_id'])){
                         $frmDate = date("Y-m-d", strtotime("+1 day", strtotime($frmDate)));
                     
 	                }
-	                $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '{$_GET['frmdate']}' && DATE(datetime) <= '{$_GET['todate']}' && account_id = '{$_GET['account_id']}' and status = 100 and type = '1'");
+                    $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '$frmDateInput' && DATE(datetime) <= '$toDateInput' && account_id = '$accountId' and status = 100 and type = '1'");
 	                while($payment = $payments->fetch_assoc()){
 	                    $ledgerRow = array();
                         $ledgerRow['date'] = date('Y-m-d', strtotime($payment['datetime']));
@@ -54,9 +79,8 @@ if(!isset($_SESSION['admin_id'])){
 	                }
                     
                     
-                    array_multisort(array_map('strtotime',array_column($ledgerarray,'date')), 
-                    SORT_ASC, 
-                    $ledgerarray);
+                    $dateSortKeys = array_map('strtotime', array_column($ledgerarray, 'date'));
+                    array_multisort($dateSortKeys, SORT_ASC, $ledgerarray);
                     
                     $sn=1;
                     foreach($ledgerarray as $ledger){
@@ -74,17 +98,17 @@ if(!isset($_SESSION['admin_id'])){
                     fclose($output);
                     exit();
     }else{
-        $frmDate = date('Y-m-d', strtotime($_GET['frmdate']));
-    $toDate = date('Y-m-d', strtotime($_GET['todate']));
+        $frmDate = $frmDateInput;
+    $toDate = $toDateInput;
     
-    $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '{$_GET['account_id']}'  and status = 100 and type = 2")->fetch_assoc()['amount']+0;
+    $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '$accountId'  and status = 100 and type = 2")->fetch_assoc()['amount']+0;
     $openBalance = $previousPaymentAmount;
     $openbalacne_row = array("1", "Opening Balance", "", "", "", "", round($openBalance, 2));
     fputcsv($output,$openbalacne_row);
     
     $ledgerarray = array();
 	                
-	                $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '{$_GET['frmdate']}' && DATE(datetime) <= '{$_GET['todate']}' && account_id = '{$_GET['account_id']}' and status = 100 and type = '2'");
+                    $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '$frmDateInput' && DATE(datetime) <= '$toDateInput' && account_id = '$accountId' and status = 100 and type = '2'");
 	                while($payment = $payments->fetch_assoc()){
 	                    $ledgerRow = array();
                         $ledgerRow['date'] = date('Y-m-d', strtotime($payment['datetime']));
@@ -96,9 +120,8 @@ if(!isset($_SESSION['admin_id'])){
 	                }
                     
                     
-                    array_multisort(array_map('strtotime',array_column($ledgerarray,'date')), 
-                    SORT_ASC, 
-                    $ledgerarray);
+                    $dateSortKeys = array_map('strtotime', array_column($ledgerarray, 'date'));
+                    array_multisort($dateSortKeys, SORT_ASC, $ledgerarray);
                     
                     $sn=1;
                     foreach($ledgerarray as $ledger){

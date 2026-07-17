@@ -4,6 +4,17 @@ require_once "inc/functions.php";
 require_once('inc/Keys.php');
 require_once('inc/eBaySession.php');
 
+if (!isset($_SESSION['admin_id'])) {
+    header("location: login.php");
+    exit();
+}
+
+if (!in_array(2, $permissions_allow)) {
+    $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Access denied to this page.</div></div>';
+    header("location: index.php");
+    exit();
+}
+
 if(isset($_REQUEST['revoke'])){
     unset($_SESSION['ebaySid']);
     unset($_SESSION['account_username']);
@@ -17,7 +28,7 @@ exit();
 if(isset($_SESSION['ebaySid'])){
     
     if(isset($_GET['username'])){
-        $_SESSION['account_username']=$_GET['username'];
+        $_SESSION['account_username'] = trim((string)$_GET['username']);
         echo "<script>
         window.opener.location = 'add_ebay_account.php';
         window.close();
@@ -29,8 +40,29 @@ if(isset($_SESSION['ebaySid'])){
 if(isset($_SESSION['renewToken'])){
     
     if(isset($_GET['username'])){
-        $username = $_GET['username'];
-        $sid = $_SESSION['rebaySid'];
+        $renewOwnerAdminId = isset($_SESSION['renewTokenOwnerAdminId']) ? (int)$_SESSION['renewTokenOwnerAdminId'] : 0;
+        $renewIssuedAt = isset($_SESSION['renewTokenIssuedAt']) ? (int)$_SESSION['renewTokenIssuedAt'] : 0;
+        if ($renewOwnerAdminId !== (int)$_SESSION['admin_id'] || $renewIssuedAt < (time() - 900)) {
+            unset($_SESSION['rebaySid']);
+            unset($_SESSION['renewToken']);
+            unset($_SESSION['renewTokenOwnerAdminId']);
+            unset($_SESSION['renewTokenIssuedAt']);
+            $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Renew session expired. Please try again.</div></div>';
+            header("location: index.php");
+            exit();
+        }
+
+        $username = trim((string)$_GET['username']);
+        $sid = isset($_SESSION['rebaySid']) ? (string)$_SESSION['rebaySid'] : '';
+
+        if ($sid === '' || $username === '') {
+            unset($_SESSION['rebaySid']);
+            unset($_SESSION['renewToken']);
+            unset($_SESSION['renewTokenOwnerAdminId']);
+            unset($_SESSION['renewTokenIssuedAt']);
+            header("location: index.php");
+            exit();
+        }
         
         // $old_username = $conn->query("select * from app_accounts WHERE id = '{$_SESSION['renewToken']}'")->fetch_assoc()['account_username'];
         
@@ -41,11 +73,15 @@ if(isset($_SESSION['renewToken'])){
         //     exit;
         // }
         
-        $check_username = $conn->query("SELECT * FROM app_accounts WHERE account_username = '$username' && id <> '{$_SESSION['renewToken']}'");
+        $renewTokenId = (int)$_SESSION['renewToken'];
+        $usernameEscaped = $conn->real_escape_string($username);
+        $check_username = $conn->query("SELECT * FROM app_accounts WHERE account_username = '$usernameEscaped' && id <> '$renewTokenId'");
         
         if($check_username->num_rows > 0){
             unset($_SESSION['rebaySid']);
             unset($_SESSION['renewToken']);
+            unset($_SESSION['renewTokenOwnerAdminId']);
+            unset($_SESSION['renewTokenIssuedAt']);
             echo 'This username is already integrated in system. <a href="index.php">Go to Dashboard</a>';
             exit; 
         }
@@ -72,18 +108,26 @@ if(isset($_SESSION['renewToken'])){
         }
         $token = $res['eBayAuthToken'];
         $expire_time =  date('Y-m-d H:i:s', strtotime($res['HardExpirationTime']));
-        $conn->query("update app_accounts set account_username = '$username', auth_token = '$token', token_expire = '$expire_time', IsTokenInvalid = '0' WHERE id = '{$_SESSION['renewToken']}'");
+        $stmt = $conn->prepare("UPDATE app_accounts SET account_username = ?, auth_token = ?, token_expire = ?, IsTokenInvalid = '0' WHERE id = ?");
+        $stmt->bind_param("sssi", $username, $token, $expire_time, $renewTokenId);
+        $stmt->execute();
+        $stmt->close();
         // echo $_SESSION['renewToken'];
         unset($_SESSION['rebaySid']);
         unset($_SESSION['renewToken']);
+        unset($_SESSION['renewTokenOwnerAdminId']);
+        unset($_SESSION['renewTokenIssuedAt']);
         header("location: index.php");
         exit();
     }
 }
 
 if(isset($_GET['renewToken'])){
-   
-    $uid = $_GET['renewToken'];
+    $uid = (int)$_GET['renewToken'];
+    if ($uid <= 0) {
+        header("location: index.php");
+        exit();
+    }
     $siteID = 0;
     $verb = 'GetSessionID';
     
@@ -104,6 +148,8 @@ if(isset($_GET['renewToken'])){
     $sid = $res['SessionID'];
     $_SESSION['rebaySid'] = $sid;
     $_SESSION['renewToken'] = $uid;
+    $_SESSION['renewTokenOwnerAdminId'] = (int)$_SESSION['admin_id'];
+    $_SESSION['renewTokenIssuedAt'] = time();
     // echo $_SESSION['renewToken'];
     // exit();
     

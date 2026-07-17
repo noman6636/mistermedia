@@ -6,18 +6,28 @@ if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
 }
 
-if($_GET['account_id']=='all'){
+$accountIdParam = isset($_GET['account_id']) ? (string)$_GET['account_id'] : '';
+$frmTs = isset($_GET['frmdate']) ? strtotime((string)$_GET['frmdate']) : false;
+$toTs = isset($_GET['todate']) ? strtotime((string)$_GET['todate']) : false;
+
+if ($accountIdParam === '' || $frmTs === false || $toTs === false) {
+    header("location: index.php");
+    exit();
+}
+
+$frmDate = date('Y-m-d', $frmTs);
+$toDate = date('Y-m-d', $toTs);
+
+if($accountIdParam==='all'){
     $account = "ALL";
     $header_row = array("Sn", "Account", "Orders", "Amount");
-    $csvName = $account.'_'.date('Y-m-d', strtotime($_GET['frmdate'])).'_'.date('Y-m-d', strtotime($_GET['todate'])).'.csv';
+    $csvName = $account.'_'.$frmDate.'_'.$toDate.'.csv';
     header('Content-Type: application/csv');
     header('Content-Disposition: attachment; filename="'.$csvName.'";');
     $output = fopen('php://output', 'w');
     
     fputcsv($output,$header_row);
     
-    $frmDate = date('Y-m-d', strtotime($_GET['frmdate']));
-    $toDate = date('Y-m-d', strtotime($_GET['todate']));
     $sn=0;
     $total_orders = 0;
     $total_amount = 0;
@@ -37,26 +47,41 @@ if($_GET['account_id']=='all'){
     fclose($output);
     exit();
 }else{
-    $account = $conn->query("select * from app_accounts where id = '{$_GET['account_id']}'")->fetch_assoc()['account_name'];
+    $accountId = (int)$accountIdParam;
+    if ($accountId <= 0) {
+        header("location: index.php");
+        exit();
+    }
+
+    $stmt = $conn->prepare("SELECT * FROM app_accounts WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $accountId);
+    $stmt->execute();
+    $accountRow = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+
+    if (!$accountRow) {
+        header("location: index.php");
+        exit();
+    }
+
+    $account = preg_replace('/[^A-Za-z0-9_\-]/', '_', (string)$accountRow['account_name']);
     $header_row = array("Sn", "Date", "Orders", "Amount");
-    $csvName = $account.'_'.date('Y-m-d', strtotime($_GET['frmdate'])).'_'.date('Y-m-d', strtotime($_GET['todate'])).'.csv';
+    $csvName = $account.'_'.$frmDate.'_'.$toDate.'.csv';
     header('Content-Type: application/csv');
     header('Content-Disposition: attachment; filename="'.$csvName.'";');
     $output = fopen('php://output', 'w');
     
     fputcsv($output,$header_row);
     
-    $account = $conn->query("select * from app_accounts where id = '{$_GET['account_id']}'")->fetch_assoc();
-    $frmDate = date('Y-m-d', strtotime($_GET['frmdate']));
-    $toDate = date('Y-m-d', strtotime($_GET['todate']));
+    $account = $accountRow;
     $sn=0;
     $total_orders = 0;
     $total_amount = 0;
     while (strtotime($frmDate) <= strtotime($toDate)) {
         $sn++;
         $date = $frmDate;
-        $ordersCount = $conn->query("SELECT * FROM `app_orders` where DATE(CreatedTime) = '$date' && AccountID = '{$_GET['account_id']}' && IsArchived = '0'")->num_rows;
-        $amountPaid = $conn->query("SELECT IFNULL(SUM(a.QuantityPurchased*a.Price), 0) amount FROM app_order_items a, app_orders b WHERE b.OrderID = a.OrderID && DATE(b.CreatedTime) = '$date'  && b.IsArchived = '0' && b.AccountID = '{$_GET['account_id']}'")->fetch_assoc()['amount'];
+        $ordersCount = $conn->query("SELECT * FROM `app_orders` where DATE(CreatedTime) = '$date' && AccountID = '$accountId' && IsArchived = '0'")->num_rows;
+        $amountPaid = $conn->query("SELECT IFNULL(SUM(a.QuantityPurchased*a.Price), 0) amount FROM app_order_items a, app_orders b WHERE b.OrderID = a.OrderID && DATE(b.CreatedTime) = '$date'  && b.IsArchived = '0' && b.AccountID = '$accountId'")->fetch_assoc()['amount'];
         $total_orders+=$ordersCount;
         $total_amount+=$amountPaid;
         $dataValus=array($sn, $date, $ordersCount, round($amountPaid, 2));

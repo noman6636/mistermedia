@@ -2,6 +2,8 @@
 require_once "inc/config.php";
 require_once "inc/functions.php";
 
+enforceCronAccess($conn);
+
 include __DIR__ . '/vendor/autoload.php';
 
 

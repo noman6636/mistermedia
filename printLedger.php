@@ -6,14 +6,37 @@ if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
 }
 
-    $account = $conn->query("select * from app_accounts where id = '{$_GET['account_id']}'")->fetch_assoc();
+$accountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;
+$ledgerType = isset($_GET['type']) ? (int)$_GET['type'] : 1;
+$frmTs = isset($_GET['frmdate']) ? strtotime((string)$_GET['frmdate']) : false;
+$toTs = isset($_GET['todate']) ? strtotime((string)$_GET['todate']) : false;
 
-if($_GET['type']==2){
+if ($accountId <= 0 || !in_array($ledgerType, array(1, 2), true) || $frmTs === false || $toTs === false) {
+    header("location: index.php");
+    exit();
+}
+
+$frmDateInput = date('Y-m-d', $frmTs);
+$toDateInput = date('Y-m-d', $toTs);
+$titleCode = $accountId.'-'.date('mdY', $frmTs).date('mdY', $toTs);
+
+$stmt = $conn->prepare("SELECT * FROM app_accounts WHERE id = ? LIMIT 1");
+$stmt->bind_param("i", $accountId);
+$stmt->execute();
+$account = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$account) {
+    header("location: index.php");
+    exit();
+}
+
+if($ledgerType==2){
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-	<title>Ledger # <?=$_GET['account_id'].'-'.date('mdY', strtotime($_GET['frmdate'])).date('mdY', strtotime($_GET['todate']));?></title>
+	<title>Ledger # <?=htmlspecialchars($titleCode, ENT_QUOTES, 'UTF-8');?></title>
 
 
 	<style>
@@ -49,11 +72,11 @@ if($_GET['type']==2){
 </head>
 <body>
     <span class="for" style="float:left;">
-        <h3 class="text-center shadowhead txtbold">Ladger : <?=$account['account_name'].' ('.date('Y/m/d', strtotime($_GET['frmdate'])).'-'.date('Y/m/d', strtotime($_GET['todate'])).')';?></h3>
+           <h3 class="text-center shadowhead txtbold">Ladger : <?=htmlspecialchars((string)$account['account_name'], ENT_QUOTES, 'UTF-8').' ('.date('Y/m/d', $frmTs).'-'.date('Y/m/d', $toTs).')';?></h3>
          <p>
-             <span><b>Phone: </b> <?=$account['phone'];?></span><br>
-             <span><b>Email: </b> <?=$account['email'];?></span><br>
-             <span><b>Address: </b> <?=$account['address'];?></span><br>
+               <span><b>Phone: </b> <?=htmlspecialchars((string)$account['phone'], ENT_QUOTES, 'UTF-8');?></span><br>
+               <span><b>Email: </b> <?=htmlspecialchars((string)$account['email'], ENT_QUOTES, 'UTF-8');?></span><br>
+               <span><b>Address: </b> <?=htmlspecialchars((string)$account['address'], ENT_QUOTES, 'UTF-8');?></span><br>
              <span><b>Type: </b> Profit</span><br>
              
         </p>
@@ -72,10 +95,10 @@ if($_GET['type']==2){
 	    </thead>
 	    <tbody>
 	        <?php 
-	        $frmDate = date('Y-m-d', strtotime($_GET['frmdate']));
-	        $toDate = date('Y-m-d', strtotime($_GET['todate']));
+            $frmDate = $frmDateInput;
+            $toDate = $toDateInput;
 	        
-	        $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '{$_GET['account_id']}'  and status = 100 and type = '2'")->fetch_assoc()['amount']+0;
+            $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '$accountId'  and status = 100 and type = '2'")->fetch_assoc()['amount']+0;
 	        $openBalance = $previousPaymentAmount;
 	        ?>
 	        <tr>
@@ -93,7 +116,7 @@ if($_GET['type']==2){
 	                $order_total = 0;
 	                $payment_total = 0;
 	                
-	                $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '{$_GET['frmdate']}' && DATE(datetime) <= '{$_GET['todate']}' && account_id = '{$_GET['account_id']}' and status = 100 and type = '2'");
+                    $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '$frmDateInput' && DATE(datetime) <= '$toDateInput' && account_id = '$accountId' and status = 100 and type = '2'");
 	                while($payment = $payments->fetch_assoc()){
 	                    $ledgerRow = array();
                         $ledgerRow['date'] = date('Y-m-d', strtotime($payment['datetime']));
@@ -107,9 +130,8 @@ if($_GET['type']==2){
 	                }
                     
                     
-                    array_multisort(array_map('strtotime',array_column($ledgerarray,'date')), 
-                    SORT_ASC, 
-                    $ledgerarray);
+                    $dateSortKeys = array_map('strtotime', array_column($ledgerarray, 'date'));
+                    array_multisort($dateSortKeys, SORT_ASC, $ledgerarray);
                     
                     $sn=1;
                     foreach($ledgerarray as $ledger){
@@ -157,7 +179,7 @@ if($_GET['type']==2){
 <?php }else{ ?>
 <html>
 <head>
-	<title>Ledger # <?=$_GET['account_id'].'-'.date('mdY', strtotime($_GET['frmdate'])).date('mdY', strtotime($_GET['todate']));?></title>
+    <title>Ledger # <?=htmlspecialchars($titleCode, ENT_QUOTES, 'UTF-8');?></title>
 
 
 	<style>
@@ -193,11 +215,11 @@ if($_GET['type']==2){
 </head>
 <body>
     <span class="for" style="float:left;">
-        <h3 class="text-center shadowhead txtbold">Ladger : <?=$account['account_name'].' ('.date('Y/m/d', strtotime($_GET['frmdate'])).'-'.date('Y/m/d', strtotime($_GET['todate'])).')';?></h3>
+           <h3 class="text-center shadowhead txtbold">Ladger : <?=htmlspecialchars((string)$account['account_name'], ENT_QUOTES, 'UTF-8').' ('.date('Y/m/d', $frmTs).'-'.date('Y/m/d', $toTs).')';?></h3>
          <p>
-             <span><b>Phone: </b> <?=$account['phone'];?></span><br>
-             <span><b>Email: </b> <?=$account['email'];?></span><br>
-             <span><b>Address: </b> <?=$account['address'];?></span><br>
+               <span><b>Phone: </b> <?=htmlspecialchars((string)$account['phone'], ENT_QUOTES, 'UTF-8');?></span><br>
+               <span><b>Email: </b> <?=htmlspecialchars((string)$account['email'], ENT_QUOTES, 'UTF-8');?></span><br>
+               <span><b>Address: </b> <?=htmlspecialchars((string)$account['address'], ENT_QUOTES, 'UTF-8');?></span><br>
              <span><b>Type: </b> Payments</span><br>
              
         </p>
@@ -216,11 +238,11 @@ if($_GET['type']==2){
 	    </thead>
 	    <tbody>
 	        <?php 
-	        $frmDate = date('Y-m-d', strtotime($_GET['frmdate']));
-	        $toDate = date('Y-m-d', strtotime($_GET['todate']));
+            $frmDate = $frmDateInput;
+            $toDate = $toDateInput;
 	        $previousOrderAmount = $conn->query("SELECT IFNULL(SUM(a.QuantityPurchased*a.Price), 0) amount FROM app_order_items a, app_orders b WHERE b.OrderID = a.OrderID && DATE(b.CreatedTime) < '$frmDate' && b.IsArchived = '0' && b.AccountID = '{$account['id']}'")->fetch_assoc()['amount'];
 	        $previousShippingCost = $conn->query("SELECT IFNULL(SUM(ShippingServiceCost), 0) amount FROM app_orders WHERE DATE(CreatedTime) < '$frmDate' &&  IsArchived = '0' && AccountID = '{$account['id']}'")->fetch_assoc()['amount'];
-	        $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '{$_GET['account_id']}'  and status = 100 and type = '1'")->fetch_assoc()['amount']+0;
+            $previousPaymentAmount =  $conn->query("SELECT SUM(amount) as amount from app_payments where DATE(datetime) < '$frmDate' && account_id = '$accountId'  and status = 100 and type = '1'")->fetch_assoc()['amount']+0;
 	        $openBalance = ($previousOrderAmount+$previousShippingCost)-$previousPaymentAmount;
 	        ?>
 	        <tr>
@@ -255,7 +277,7 @@ if($_GET['type']==2){
                         $frmDate = date("Y-m-d", strtotime("+1 day", strtotime($frmDate)));
                     
 	                }
-	                $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '{$_GET['frmdate']}' && DATE(datetime) <= '{$_GET['todate']}' && account_id = '{$_GET['account_id']}' and status = 100 and type = '1'");
+                    $payments =  $conn->query("SELECT * from app_payments where DATE(datetime) >= '$frmDateInput' && DATE(datetime) <= '$toDateInput' && account_id = '$accountId' and status = 100 and type = '1'");
 	                while($payment = $payments->fetch_assoc()){
 	                    $ledgerRow = array();
                         $ledgerRow['date'] = date('Y-m-d', strtotime($payment['datetime']));
@@ -269,9 +291,8 @@ if($_GET['type']==2){
 	                }
                     
                     
-                    array_multisort(array_map('strtotime',array_column($ledgerarray,'date')), 
-                    SORT_ASC, 
-                    $ledgerarray);
+                    $dateSortKeys = array_map('strtotime', array_column($ledgerarray, 'date'));
+                    array_multisort($dateSortKeys, SORT_ASC, $ledgerarray);
                     
                     $sn=1;
                     foreach($ledgerarray as $ledger){

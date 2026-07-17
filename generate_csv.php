@@ -11,14 +11,30 @@ if(!in_array(11, $permissions_allow)){
     exit();
 }
 
-if(isset($_GET['delete'])){
-    $id = $_GET['delete'];
-    $file = $conn->query("select * from csv_files where id = '$id'")->fetch_assoc();
-    @unlink('csv_files/'.$file['filename']);
-    $conn->query("delete from csv_files where id = '$id'");
-    
-    addSystemLog($conn, 'CSV DELETED', "CSV File (".$file['filename'].") has been deleted", "");
-    $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Your file has been deleted.</div></div>';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    enforceCsrfOrAbort('generate_csv.php');
+}
+
+if(isset($_POST['delete_csv'])){
+    $id = (int)$_POST['delete_csv'];
+    if ($id > 0) {
+        $stmt = $conn->prepare("SELECT * FROM csv_files WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $file = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($file && !empty($file['filename'])) {
+            @unlink('csv_files/' . $file['filename']);
+            $stmt = $conn->prepare("DELETE FROM csv_files WHERE id = ?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            $stmt->close();
+
+            addSystemLog($conn, 'CSV DELETED', "CSV File (".$file['filename'].") has been deleted", "");
+            $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Your file has been deleted.</div></div>';
+        }
+    }
     header("location: generate_csv.php");
     exit();
 }
@@ -366,6 +382,7 @@ exit;
                        
                         <div class="col-12">
                             <form action="" method="POST" style="margin-bottom: 10px;">
+                                <?= csrfInput(); ?>
                                 <div class="row">
                                     <div class="col-sm-3 col-12">
                                         <select name="AccountID" class="form-control" required>
@@ -445,7 +462,11 @@ exit;
                                                 <td><?php echo $file['datetime']; ?></td>
                                                
                                                 <td><a href="csv_files/<?php echo $file['filename']; ?>" class="btn btn-primary" downlaod>Download</a>
-                                                <a href="?delete=<?php echo $file['id']; ?>" class="btn btn-danger">Delete</a></td>
+                                                <form action="" method="post" style="display:inline-block;">
+                                                    <?= csrfInput(); ?>
+                                                    <input type="hidden" name="delete_csv" value="<?php echo (int)$file['id']; ?>">
+                                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                                </form></td>
                                             </tr>
                                         <?php } ?>
                                         </tbody>

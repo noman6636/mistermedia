@@ -17,12 +17,48 @@ if (!isset($_GET['MessageID'])) {
     exit();
 }
 
-$message = $conn->query("SELECT * FROM app_messages WHERE MessageID = '{$_GET['MessageID']}'")->fetch_assoc();
+if (!isset($_GET['account_id'])) {
+    header("location: index.php");
+    exit();
+}
 
-$conn->query("update app_messages set ReadStatus = 1 where MessageID = '{$_GET['MessageID']}'");
+$accountId = (int)$_GET['account_id'];
+$messageIdParam = trim((string)$_GET['MessageID']);
+
+if ($accountId <= 0 || $messageIdParam === '') {
+    header("location: index.php");
+    exit();
+}
+
+$stmt = $conn->prepare("SELECT * FROM app_messages WHERE MessageID = ?");
+$stmt->bind_param("s", $messageIdParam);
+$stmt->execute();
+$message = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$message) {
+    $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Message not found.</div></div>';
+    header("location: view_messages.php?account_id=" . $accountId . "&folder=0");
+    exit();
+}
+
+$stmt = $conn->prepare("UPDATE app_messages SET ReadStatus = 1 WHERE MessageID = ?");
+$stmt->bind_param("s", $messageIdParam);
+$stmt->execute();
+$stmt->close();
 $messageId = $message['ExternalMessageID'];
 
-$userAccount = $conn->query("select * from app_accounts where id = '{$_GET['account_id']}'")->fetch_assoc();
+$stmt = $conn->prepare("SELECT * FROM app_accounts WHERE id = ?");
+$stmt->bind_param("i", $accountId);
+$stmt->execute();
+$userAccount = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$userAccount) {
+    $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Account not found.</div></div>';
+    header("location: view_messages.php?account_id=" . $accountId . "&folder=0");
+    exit();
+}
 
 if ($userAccount['account_username'] == $message['Sender']) {
     $RecipientID = $message['SendToName'];
@@ -31,59 +67,59 @@ if ($userAccount['account_username'] == $message['Sender']) {
 }
 
 
-if (isset($_POST['reply_message'])) {
-    $msg = $_POST['message'];
+// if (isset($_POST['reply_message'])) {
+//     $msg = $_POST['message'];
 
 
 
-    require_once('inc/Keys.php');
-    require_once('inc/eBaySession.php');
+//     require_once('inc/Keys.php');
+//     require_once('inc/eBaySession.php');
 
 
 
-    $siteID = 0;
-    $verb = 'AddMemberMessageRTQ';
+//     $siteID = 0;
+//     $verb = 'AddMemberMessageRTQ';
 
-    $userToken = $userAccount['auth_token'];
+//     $userToken = $userAccount['auth_token'];
 
 
-    $requestXmlBody = '<?xml version="1.0" encoding="utf-8"?>';
-    $requestXmlBody .= '<AddMemberMessageRTQ xmlns="urn:ebay:apis:eBLBaseComponents">';
-    $requestXmlBody .= "<MemberMessage><Body>$msg</Body><ParentMessageID>$messageId</ParentMessageID><RecipientID>$RecipientID</RecipientID></MemberMessage>";
-    $requestXmlBody .= "<RequesterCredentials><eBayAuthToken>$userToken</eBayAuthToken></RequesterCredentials>";
-    $requestXmlBody .= '</AddMemberMessageRTQ>';
+//     $requestXmlBody = '<?xml version="1.0" encoding="utf-8"?>';
+//     $requestXmlBody .= '<AddMemberMessageRTQ xmlns="urn:ebay:apis:eBLBaseComponents">';
+//     $requestXmlBody .= "<MemberMessage><Body>$msg</Body><ParentMessageID>$messageId</ParentMessageID><RecipientID>$RecipientID</RecipientID></MemberMessage>";
+//     $requestXmlBody .= "<RequesterCredentials><eBayAuthToken>$userToken</eBayAuthToken></RequesterCredentials>";
+//     $requestXmlBody .= '</AddMemberMessageRTQ>';
 
-    //Create a new eBay session with all details pulled in from included keys.php
-    $session = new eBaySession($userToken, $devID, $appID, $certID, $serverUrl, $compatabilityLevel, $siteID, $verb);
+//     //Create a new eBay session with all details pulled in from included keys.php
+//     $session = new eBaySession($userToken, $devID, $appID, $certID, $serverUrl, $compatabilityLevel, $siteID, $verb);
 
-    //send the request and get response
-    $responseXml = $session->sendHttpRequest($requestXmlBody);
-    if (stristr($responseXml, 'HTTP 404') || $responseXml == '') {
-        echo '<p>Error sending request</p><br>';
-        exit;
-    } else {
-        $res = XML2Array($responseXml);
-        // print_r($res);
-        // exit;
+//     //send the request and get response
+//     $responseXml = $session->sendHttpRequest($requestXmlBody);
+//     if (stristr($responseXml, 'HTTP 404') || $responseXml == '') {
+//         echo '<p>Error sending request</p><br>';
+//         exit;
+//     } else {
+//         $res = XML2Array($responseXml);
+//         // print_r($res);
+//         // exit;
 
-        if ($res['Ack'] == 'Success') {
-            sleep(5);
-            require_once('inc/importMessage.php');
+//         if ($res['Ack'] == 'Success') {
+//             sleep(5);
+//             require_once('inc/importMessage.php');
 
-            $CreateTimeFrom = gmdate("Y-m-d\TH:i:s", strtotime($res['Timestamp']) - 240); //current time minus 30 minutes
-            $CreateTimeTo = gmdate("Y-m-d\TH:i:s", strtotime($res['Timestamp']) + 240);
+//             $CreateTimeFrom = gmdate("Y-m-d\TH:i:s", strtotime($res['Timestamp']) - 240); //current time minus 30 minutes
+//             $CreateTimeTo = gmdate("Y-m-d\TH:i:s", strtotime($res['Timestamp']) + 240);
 
-            $verb = 'GetMyMessages';
-            getImportMsgEbay($conn, $siteID, $verb, $CreateTimeFrom, $CreateTimeTo, $userToken, $_GET['account_id'], $devID, $appID, $certID, $serverUrl, $compatabilityLevel, 1);
-            $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Your message has been sent successfully.</div></div>';
-            header("location: view_message?MessageID=" . $_GET['MessageID'] . "&account_id=" . $_GET['account_id']);
-            exit();
-        } else {
-            echo '<p>Error sending request</p><br>';
-            exit;
-        }
-    }
-}
+//             $verb = 'GetMyMessages';
+//             getImportMsgEbay($conn, $siteID, $verb, $CreateTimeFrom, $CreateTimeTo, $userToken, $_GET['account_id'], $devID, $appID, $certID, $serverUrl, $compatabilityLevel, 1);
+//             $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Your message has been sent successfully.</div></div>';
+//             header("location: view_message?MessageID=" . $_GET['MessageID'] . "&account_id=" . $_GET['account_id']);
+//             exit();
+//         } else {
+//             echo '<p>Error sending request</p><br>';
+//             exit;
+//         }
+//     }
+// }
 ?>
 <!DOCTYPE html>
 <html class="loading" lang="en" data-textdirection="ltr">
@@ -231,8 +267,8 @@ if (isset($_POST['reply_message'])) {
                             <?php echo flash_msg(); ?>
                             <div class="card">
                                 <div class="card-header border-bottom">
-                                    <h4 style="color:#0e83ba">Subject : <?= $message['Subject']; ?></h4>
-                                    <h6>Item : <?= $message['ItemTitle']; ?></h6>
+                                    <h4 style="color:#0e83ba">Subject : <?= htmlspecialchars($message['Subject'], ENT_QUOTES, 'UTF-8'); ?></h4>
+                                    <h6>Item : <?= htmlspecialchars($message['ItemTitle'], ENT_QUOTES, 'UTF-8'); ?></h6>
                                     <!-- <div class="accordion">
                                         <div class="accordion-item">
                                             <div class="accordion-item-header">
@@ -323,7 +359,13 @@ if (isset($_POST['reply_message'])) {
                                         }
                                     </style>
                                     <?php
-                                    $messages = $conn->query("SELECT * FROM app_messages WHERE AccountID = '{$message['AccountID']}' && ((Sender='{$message['Sender']}' && SendToName='{$message['SendToName']}') || (Sender='{$message['SendToName']}' && SendToName='{$message['Sender']}')) ORDER BY ReceiveDate DESC");
+                                    $threadAccountId = (int)$message['AccountID'];
+                                    $sender = $message['Sender'];
+                                    $sendTo = $message['SendToName'];
+                                    $stmt = $conn->prepare("SELECT * FROM app_messages WHERE AccountID = ? AND ((Sender = ? AND SendToName = ?) OR (Sender = ? AND SendToName = ?)) ORDER BY ReceiveDate DESC");
+                                    $stmt->bind_param("issss", $threadAccountId, $sender, $sendTo, $sendTo, $sender);
+                                    $stmt->execute();
+                                    $messages = $stmt->get_result();
                                     while ($message = $messages->fetch_assoc()) { ?>
                                         <div class="ticket-reply markdown-content staff">
                                             <div class="date">
@@ -331,14 +373,15 @@ if (isset($_POST['reply_message'])) {
                                             </div>
                                             <div class="user">
                                                 <span class="name">
-                                                    <?= $message['Sender']; ?>
+                                                    <?= htmlspecialchars($message['Sender'], ENT_QUOTES, 'UTF-8'); ?>
                                                 </span>
                                             </div>
                                             <div class="message">
-                                                <p><?= $message['Text']; ?></p>
+                                                <p><?= nl2br(htmlspecialchars($message['Text'], ENT_QUOTES, 'UTF-8')); ?></p>
                                             </div>
                                         </div>
-                                    <?php } ?>
+                                    <?php }
+                                    $stmt->close(); ?>
 
                                 </div>
                             </div>

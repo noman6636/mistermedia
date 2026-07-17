@@ -1,4 +1,102 @@
 <?php
+function getCsrfToken() {
+    if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return $_SESSION['csrf_token'];
+}
+
+function csrfInput() {
+    $token = htmlspecialchars(getCsrfToken(), ENT_QUOTES, 'UTF-8');
+    return '<input type="hidden" name="csrf_token" value="' . $token . '">';
+}
+
+function verifyCsrfToken($token) {
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        return false;
+    }
+
+    if (!is_string($token) || $token === '') {
+        return false;
+    }
+
+    return hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function enforceCsrfOrAbort($redirectPath = 'index.php') {
+    $token = isset($_POST['csrf_token']) ? $_POST['csrf_token'] : '';
+    if (!verifyCsrfToken($token)) {
+        $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Invalid security token. Please try again.</div></div>';
+        header('location: ' . $redirectPath);
+        exit();
+    }
+}
+
+function isCliRequest() {
+    return (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg');
+}
+
+function getRequestHeaderValue($name) {
+    $normalized = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+    if (isset($_SERVER[$normalized])) {
+        return (string)$_SERVER[$normalized];
+    }
+
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        foreach ($headers as $headerName => $headerValue) {
+            if (strcasecmp($headerName, $name) === 0) {
+                return (string)$headerValue;
+            }
+        }
+    }
+
+    return '';
+}
+
+function getConfiguredCronKey($conn = null) {
+    $envKey = getenv('DORDERS_CRON_KEY');
+    if (is_string($envKey) && $envKey !== '') {
+        return $envKey;
+    }
+
+    if ($conn instanceof mysqli) {
+        $result = $conn->query("SELECT value FROM app_settings WHERE name = 'cron_web_key' LIMIT 1");
+        if ($result && $row = $result->fetch_assoc()) {
+            $dbKey = isset($row['value']) ? trim((string)$row['value']) : '';
+            if ($dbKey !== '') {
+                return $dbKey;
+            }
+        }
+    }
+
+    return '';
+}
+
+function enforceCronAccess($conn = null) {
+    if (isCliRequest()) {
+        return;
+    }
+
+    $expectedKey = getConfiguredCronKey($conn);
+    $providedKey = '';
+
+    if (isset($_GET['cron_key'])) {
+        $providedKey = (string)$_GET['cron_key'];
+    }
+
+    if ($providedKey === '') {
+        $providedKey = getRequestHeaderValue('X-CRON-KEY');
+    }
+
+    if ($expectedKey === '' || $providedKey === '' || !hash_equals($expectedKey, $providedKey)) {
+        http_response_code(403);
+        echo 'Forbidden';
+        exit();
+    }
+}
+
 function removeEmoji($string) {
     // Remove various emoji and symbol Unicode ranges
     $regex_patterns = [
