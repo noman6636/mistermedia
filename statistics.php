@@ -20,44 +20,58 @@ if ((empty($permissions_allow) || (!in_array(27, $permissions_allow) && !in_arra
 if (isset($_GET['items_csv'])) {
     $data = array();
     $items = $conn->query("SELECT * FROM app_items WHERE deleted = 0 ORDER BY sku ASC");
+    $priceMap = array();
+    $packageSizeMap = array();
+    
+    if ($items && $items->num_rows > 0) {
+        $itemIds = array();
+        $packingSizeIds = array();
+        while ($itemRow = $items->fetch_assoc()) {
+            $itemIds[] = (int)($itemRow['id'] ?? 0);
+            if (!empty($itemRow['packing_size_id'])) {
+                $packingSizeIds[] = (int)$itemRow['packing_size_id'];
+            }
+        }
+
+        if (!empty($itemIds)) {
+            $itemIds = array_values(array_unique(array_filter($itemIds)));
+            $idsCsv = implode(',', $itemIds);
+            $prices = $conn->query("SELECT item_id, name_id, price FROM app_sellprices_amount WHERE item_id IN ($idsCsv) AND name_id IN (1,2,5,8)");
+            if ($prices) {
+                while ($priceRow = $prices->fetch_assoc()) {
+                    $pItemId = (int)($priceRow['item_id'] ?? 0);
+                    $pNameId = (int)($priceRow['name_id'] ?? 0);
+                    if (!isset($priceMap[$pItemId])) {
+                        $priceMap[$pItemId] = array();
+                    }
+                    $priceMap[$pItemId][$pNameId] = $priceRow['price'] ?? 0;
+                }
+            }
+        }
+
+        if (!empty($packingSizeIds)) {
+            $packingSizeIds = array_values(array_unique(array_filter($packingSizeIds)));
+            $sizeIdsCsv = implode(',', $packingSizeIds);
+            $sizes = $conn->query("SELECT id, name FROM app_packing_sizes WHERE id IN ($sizeIdsCsv)");
+            if ($sizes) {
+                while ($sizeRow = $sizes->fetch_assoc()) {
+                    $packageSizeMap[(int)($sizeRow['id'] ?? 0)] = $sizeRow['name'] ?? '';
+                }
+            }
+        }
+
+        $items->data_seek(0);
+    }
     
     if ($items) {
         while ($item = $items->fetch_assoc()) {
             $itemData = array();
             $itemData['SKU'] = $item['sku'] ?? '';
-            
-            // Fetch package size name
-            $packageSizeName = '';
-            if (!empty($item['packing_size_id'])) {
-                $sizeQuery = $conn->query("SELECT name FROM app_packing_sizes WHERE id = {$item['packing_size_id']}");
-               
-                if ($sizeQuery && $sizeQuery->num_rows > 0) {
-                    $sizeRow = $sizeQuery->fetch_assoc();
-                    $packageSizeName = $sizeRow['name'] ?? '';
-                    
-                }
-            }
-            $item_id = $item['id'];
-            $DPrice = $conn->query("
-                        SELECT *
-                        FROM app_sellprices_amount
-                        WHERE item_id = '$item_id' AND name_id = 1
-                        LIMIT 1
-                    ")->fetch_assoc();
-              
-                     
-            $newcostPrice = $conn->query("
-                        SELECT *
-                        FROM app_sellprices_amount
-                        WHERE item_id = '$item_id' AND name_id = 8
-                        LIMIT 1
-                    ")->fetch_assoc();
-            $vatPrice = $conn->query("
-                        SELECT *
-                        FROM app_sellprices_amount
-                        WHERE item_id = '$item_id' AND name_id = 2
-                        LIMIT 1
-                    ")->fetch_assoc();
+
+            $itemId = (int)($item['id'] ?? 0);
+            $packingSizeId = (int)($item['packing_size_id'] ?? 0);
+            $itemPrices = $priceMap[$itemId] ?? array();
+            $packageSizeName = $packageSizeMap[$packingSizeId] ?? '';
                     
             $itemData['Package_Size'] = $packageSizeName;
             
@@ -67,9 +81,10 @@ if (isset($_GET['items_csv'])) {
                 $itemData['Remaining_Stock'] = $dataStat['remain_stock'] ?? 0;
                 $itemData['Upcoming_Stock'] = $dataStat['upcoming_stock'] ?? 0;
                 $itemData['Cost_Price_(£)'] = $dataStat['cost_price'] ?? 0;
-                $itemData['Cost_Price_($)'] = $newcostPrice['price'] ?? 0;
-                $itemData['Default_Price'] = $DPrice['price'] ?? 0;
-                $itemData['Vat_Price'] = $vatPrice['price'] ?? 0;
+                $itemData['Cost_Price_($)'] = $itemPrices[8] ?? 0;
+                $itemData['Default_Price'] = $itemPrices[1] ?? 0;
+                $itemData['FBA_Price'] = $itemPrices[5] ?? 0;
+                $itemData['Vat_Price'] = $itemPrices[2] ?? 0;
                 
                 $itemData['Available_Stock_Amount'] = ($itemData['Remaining_Stock'] ?? 0) * ($dataStat['cost_price'] ?? 0);
                 $itemData['Upcoming_Stock_Amount'] = ($itemData['Upcoming_Stock'] ?? 0) * ($dataStat['cost_price'] ?? 0);
@@ -80,6 +95,7 @@ if (isset($_GET['items_csv'])) {
                 $itemData['Available_Stock_Amount'] = 0;
                 $itemData['Upcoming_Stock_Amount'] = 0;
                 $itemData['Default_Price'] = 0;
+                $itemData['FBA_Price'] = 0;
                 // $itemData['New_Cost_Price'] =  0;
                 $itemData['Vat_Price'] =  0;
             }
@@ -169,17 +185,6 @@ if (isset($_GET['recover'])) {
     <!-- BEGIN: Custom CSS-->
     <link rel="stylesheet" type="text/css" href="assets/css/style.css">
     <!-- END: Custom CSS-->
-    
-    <!-- DataTables CSS -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
-    
-    <!-- jQuery + DataTables JS -->
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
-    <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
     <style>
         /* ================= MOBILE ================= */
 @media (max-width: 768px) {
@@ -328,6 +333,32 @@ if (isset($_GET['recover'])) {
                         //     "SELECT * FROM app_items WHERE deleted = 0 ORDER BY sku ASC";
                             
                         $items = $conn->query($query);
+                        $itemPriceMap = array();
+
+                        if ($items && $items->num_rows > 0) {
+                            $itemIds = array();
+                            while ($itemRow = $items->fetch_assoc()) {
+                                $itemIds[] = (int)($itemRow['id'] ?? 0);
+                            }
+
+                            if (!empty($itemIds)) {
+                                $itemIds = array_values(array_unique(array_filter($itemIds)));
+                                $idsCsv = implode(',', $itemIds);
+                                $itemPrices = $conn->query("SELECT item_id, name_id, price FROM app_sellprices_amount WHERE item_id IN ($idsCsv) AND name_id IN (2,5)");
+                                if ($itemPrices) {
+                                    while ($priceRow = $itemPrices->fetch_assoc()) {
+                                        $pItemId = (int)($priceRow['item_id'] ?? 0);
+                                        $pNameId = (int)($priceRow['name_id'] ?? 0);
+                                        if (!isset($itemPriceMap[$pItemId])) {
+                                            $itemPriceMap[$pItemId] = array();
+                                        }
+                                        $itemPriceMap[$pItemId][$pNameId] = $priceRow['price'] ?? 0;
+                                    }
+                                }
+                            }
+
+                            $items->data_seek(0);
+                        }
           
                         $sn = 0;
                         $today = date('Y-m-d');
@@ -343,22 +374,8 @@ if (isset($_GET['recover'])) {
                                 $remain_stock = 0;
                                 $upcoming_stock = 0;
                                 $cost_price = 0;
-                                $item_id = $item['id'];
-                                
-                                $VatPrice = $conn->query("
-                                    SELECT *
-                                    FROM app_sellprices_amount
-                                    WHERE item_id = '$item_id' AND name_id = 2
-                                    LIMIT 1
-                                ")->fetch_assoc();
-                          
-                                 
-                                $FbaPrice = $conn->query("
-                                    SELECT *
-                                    FROM app_sellprices_amount
-                                    WHERE item_id = '$item_id' AND name_id = 5
-                                    LIMIT 1
-                                ")->fetch_assoc();
+                                $itemId = (int)($item['id'] ?? 0);
+                                $prices = $itemPriceMap[$itemId] ?? array();
                                 
                                 // if (isset($item['item_type']) && $item['item_type'] == 1) {
                                     $dataStat = json_decode($item['statistics'] ?? '{}', true) ?? array();
@@ -377,8 +394,8 @@ if (isset($_GET['recover'])) {
                                 $itemsArray['sku'] = $item['sku'] ?? '';
                                 $itemsArray['name'] = $item['name'] ?? '';
                                 $itemsArray['price'] = $item['price'] ?? 0;
-                                $itemsArray['vat_price'] = $VatPrice['price'] ?? 0;
-                                $itemsArray['fba_price'] = $FbaPrice['price'] ?? 0;
+                                $itemsArray['vat_price'] = $prices[2] ?? 0;
+                                $itemsArray['fba_price'] = $prices[5] ?? 0;
                                 $itemsArray['image'] = $item['image'] ?? 'https://cdn-icons-png.flaticon.com/128/1829/1829586.png';
                                 $itemsArray['deleted'] = $item['deleted'] ?? 0;
                                 $itemsArray['inhide_outofstock'] = ($remain_stock < 0) ? 0 : ($item['inhide_outofstock'] ?? 0);
@@ -807,8 +824,6 @@ if (isset($_GET['recover'])) {
     <!-- BEGIN: Vendor JS-->
     <script src="app-assets/vendors/js/vendors.min.js"></script>
     <!-- BEGIN Vendor JS-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
     <!-- BEGIN: Page Vendor JS-->
     <script src="app-assets/vendors/js/ui/jquery.sticky.js"></script>
     <script src="app-assets/vendors/js/tables/datatable/jquery.dataTables.min.js"></script>
@@ -835,12 +850,6 @@ if (isset($_GET['recover'])) {
     <script src="app-assets/js/core/app.js"></script>
     <!-- END: Theme JS-->
     <script src="https://cdn.jsdelivr.net/gh/linways/table-to-excel@v1.0.4/dist/tableToExcel.js"></script>
-<script src="app-assets/vendors/js/vendors.min.js"></script>
-
-<!-- Other vendor scripts -->
-<script src="app-assets/vendors/js/ui/jquery.sticky.js"></script>
-<script src="app-assets/vendors/js/tables/datatable/jquery.dataTables.min.js"></script>
-<script src="app-assets/vendors/js/tables/datatable/datatables.bootstrap4.min.js"></script>
     <!-- BEGIN: Page JS-->
     <script src="app-assets/js/scripts/tables/table-datatables-basic.js"></script>
 
