@@ -347,7 +347,7 @@ img {
                 var item = items[i];
                 var safeSku = escapeHtml(item.sku);
                 var safeImage = escapeHtml(item.image || '54818317.png');
-                html += '<tr style="cursor: pointer;" onclick="viewItemPage(' + JSON.stringify(item.sku) + ')">';
+                html += '<tr class="sku-row" data-sku="' + safeSku + '" style="cursor: pointer;">';
                 html += '<td style="padding: 5px;display: flex;align-items: center;"><img src="items_image/' + safeImage + '" style="width: 30px;margin-right: 10px;"/> ' + safeSku + '</td>';
                 html += '</tr>';
             }
@@ -392,6 +392,11 @@ img {
                 loadSkuList($('#sku').val(), false);
             }, 250);
         }
+
+        $(document).on('click', '#item_sku_body .sku-row', function(){
+            var sku = $(this).data('sku');
+            viewItemPage(sku);
+        });
          
         function viewItemPage(sku){
             if(!sku){
