@@ -28,6 +28,7 @@ if ($sessionFingerprint === '' || !hash_equals($sessionFingerprint, buildSession
 }
 
 $permissions_allow = (isset($permissions_allow) && is_array($permissions_allow)) ? $permissions_allow : [];
+$permissions_allow = array_map('intval', $permissions_allow);
 
 function requirePermission(array $permissions_allow, int $permissionId) {
     if (!in_array($permissionId, $permissions_allow, true)) {
