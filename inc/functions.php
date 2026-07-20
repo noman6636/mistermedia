@@ -389,33 +389,36 @@ function flash_msg() {
 }
 
 function getStock($conn, $item_id, $sku) {
-    $total_stock = (int) $conn->query("Select IFNULL(SUM(qty), 0) as qty from app_stocks where item_id = '{$item_id}'")->fetch_assoc()["qty"] + 0;
-    
-    $total_sale_from_order_item = (int) $conn->query("
-        Select SUM(a.QuantityPurchased) as qty 
-        from app_order_items a, app_orders b 
-        where a.SKU = '{$sku}' && b.IsArchived = '0' && b.OrderID = a.OrderID"
-    )->fetch_assoc()["qty"] + 0;
-    
-    $package_items_sku = $conn->query("
-        SELECT IFNULL(SUM(a.qty), 0) as qty, b.sku 
-        FROM `app_packages_items` as a, app_packages as b 
-        WHERE a.item_id = '{$item_id}' && b.id = a.package_id 
-        GROUP by a.package_id"
-    );
-    
-    $total_sale_from_order_package = 0;
-    while ($package_item_sku = $package_items_sku->fetch_assoc()) {
-        $tqtypis = (int) $conn->query("
-            Select SUM(a.QuantityPurchased) as qty 
-            from app_order_items a, app_orders b 
-            where a.SKU = '{$package_item_sku["sku"]}' && b.IsArchived = '0' && b.OrderID = a.OrderID"
-        )->fetch_assoc()["qty"] + 0;
-        
-        $total_sale_from_order_package += $package_item_sku["qty"] * $tqtypis;
-    }
-    
-    return (int) $total_stock - ($total_sale_from_order_item + $total_sale_from_order_package);
+    $item_id = (int) $item_id;
+    $sku_escaped = $conn->real_escape_string((string)$sku);
+
+    $stock_rs = $conn->query("SELECT IFNULL(SUM(qty), 0) AS qty FROM app_stocks WHERE item_id = {$item_id}");
+    $total_stock = $stock_rs ? ((int)$stock_rs->fetch_assoc()["qty"] + 0) : 0;
+
+    $item_sale_rs = $conn->query("
+        SELECT IFNULL(SUM(a.QuantityPurchased), 0) AS qty
+        FROM app_order_items a
+        INNER JOIN app_orders b ON b.OrderID = a.OrderID
+        WHERE a.SKU = '{$sku_escaped}' AND b.IsArchived = '0'
+    ");
+    $total_sale_from_order_item = $item_sale_rs ? ((int)$item_sale_rs->fetch_assoc()["qty"] + 0) : 0;
+
+    $package_sale_rs = $conn->query("
+        SELECT IFNULL(SUM(pi.qty * IFNULL(oi.qty_sold, 0)), 0) AS qty
+        FROM app_packages_items pi
+        INNER JOIN app_packages p ON p.id = pi.package_id
+        LEFT JOIN (
+            SELECT a.SKU, IFNULL(SUM(a.QuantityPurchased), 0) AS qty_sold
+            FROM app_order_items a
+            INNER JOIN app_orders b ON b.OrderID = a.OrderID
+            WHERE b.IsArchived = '0'
+            GROUP BY a.SKU
+        ) oi ON oi.SKU = p.sku
+        WHERE pi.item_id = {$item_id}
+    ");
+    $total_sale_from_order_package = $package_sale_rs ? ((int)$package_sale_rs->fetch_assoc()["qty"] + 0) : 0;
+
+    return (int)$total_stock - ($total_sale_from_order_item + $total_sale_from_order_package);
 }
 
 function get_client_ip() {

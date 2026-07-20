@@ -256,22 +256,9 @@ img {
             
             <div class="col-12" style="height: calc(100vh - 200px);overflow: scroll;">
                 <table width="100%" id="item_sku"  class="table table-bordered">
-                    <?php
-                    $items = $conn->query("SELECT sku, image FROM app_items WHERE deleted = 0 AND item_type = 1 AND sku != '' ORDER BY sku ASC");
-                    $first_sku = '';
-                    while($item = $items->fetch_assoc()){
-                        $sku = $item['sku'];
-                        if($first_sku === ''){
-                            $first_sku = $sku;
-                        }
-                    ?>
-                                                                                     
-                    <tr style="cursor: pointer;" onclick='viewItemPage(<?=json_encode($sku);?>)'>
-                        <td style="padding: 5px;display: flex;align-items: center;"><img src="items_image/<?php if($item['image']!=''){ ?><?=htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8'); }else{ echo '54818317.png'; } ?>" style="width: 30px;margin-right: 10px;"/> <?=htmlspecialchars($item['sku'], ENT_QUOTES, 'UTF-8');?></td>
-                    </tr>
-                    
-                    <?php } ?>
+                    <tbody id="item_sku_body"></tbody>
                 </table>
+                <small class="text-muted d-block mt-1">Type SKU to search (showing max 200 records).</small>
             </div>
             
         </div>
@@ -345,27 +332,67 @@ img {
         
     </script>
     <script>
+        function escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderSkuRows(items) {
+            var html = '';
+            for (var i = 0; i < items.length; i++) {
+                var item = items[i];
+                var safeSku = escapeHtml(item.sku);
+                var safeImage = escapeHtml(item.image || '54818317.png');
+                html += '<tr style="cursor: pointer;" onclick="viewItemPage(' + JSON.stringify(item.sku) + ')">';
+                html += '<td style="padding: 5px;display: flex;align-items: center;"><img src="items_image/' + safeImage + '" style="width: 30px;margin-right: 10px;"/> ' + safeSku + '</td>';
+                html += '</tr>';
+            }
+
+            if (!html) {
+                html = '<tr><td style="padding: 8px;">No SKU found.</td></tr>';
+            }
+
+            $('#item_sku_body').html(html);
+        }
+
+        function loadSkuList(query, autoOpenFirst) {
+            $.ajax({
+                url: 'item_aio_sku_ajax.php',
+                dataType: 'json',
+                type: 'POST',
+                data: {
+                    q: query || '',
+                    limit: 200
+                },
+                timeout: 20000
+            }).done(function(res) {
+                if (!res || res.status !== 'success') {
+                    renderSkuRows([]);
+                    return;
+                }
+
+                renderSkuRows(res.items || []);
+
+                if (autoOpenFirst && res.items && res.items.length) {
+                    viewItemPage(res.items[0].sku);
+                }
+            }).fail(function() {
+                renderSkuRows([]);
+            });
+        }
+
+        var skuSearchTimer = null;
         function searchSKU() {
-          var input, filter, table, tr, td, i, txtValue;
-          input = document.getElementById("sku");
-          filter = input.value.toUpperCase();
-          table = document.getElementById("item_sku");
-          tr = table.getElementsByTagName("tr");
-          for (i = 0; i < tr.length; i++) {
-            td = tr[i].getElementsByTagName("td")[0];
-            if (td) {
-              txtValue = td.textContent || td.innerText;
-              if (txtValue.toUpperCase().indexOf(filter) > -1) {
-                tr[i].style.display = "";
-              } else {
-                tr[i].style.display = "none";
-              }
-            }       
-          }
+            clearTimeout(skuSearchTimer);
+            skuSearchTimer = setTimeout(function() {
+                loadSkuList($('#sku').val(), false);
+            }, 250);
         }
          
-        var initialSku = <?php echo json_encode($first_sku); ?>;
-
         function viewItemPage(sku){
             if(!sku){
                 $("#loading").html("<h4>No SKU found.</h4>");
@@ -391,19 +418,16 @@ img {
                 if(xhr.responseText && xhr.responseText.trim() !== ''){
                     message = 'Unable to load item details. Server returned an error.';
                 }
-                $("#loading").html("<div class='alert alert-danger' role='alert'><div class='alert-body'>" + message + "</div></div>");
+                $("#databox").html("<div class='alert alert-danger' role='alert'><div class='alert-body'>" + message + "</div></div>");
+                $("#databox").show();
             })
             .always(function(){
-                if($("#databox").is(":visible")){
-                    $("#loading").hide();
-                }
+                $("#loading").hide();
             });
         }
 
         $(document).ready(function(){
-            if(initialSku){
-                viewItemPage(initialSku);
-            }
+            loadSkuList('', true);
         });
         
         

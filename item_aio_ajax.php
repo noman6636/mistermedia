@@ -162,9 +162,16 @@ if($check_sku_item && $check_sku_item->num_rows > 0){
                                                         <h2 style="text-align:center; margin-top:10px">Price Information</h2>
                                                         <div class="row">
                                                             <?php 
+                                                            $price_values = array();
+                                                            $price_amounts = $conn->query("SELECT name_id, price FROM app_sellprices_amount WHERE item_id = '{$item['id']}' AND type = '1'");
+                                                            if($price_amounts){
+                                                                while($price_amount = $price_amounts->fetch_assoc()){
+                                                                    $price_values[$price_amount['name_id']] = $price_amount['price'] + 0;
+                                                                }
+                                                            }
                                                             $prices = $conn->query("select * from app_sellprices_name order by id asc");
                                                             while($price = $prices->fetch_assoc()){ 
-                                                            $cprice = $conn->query("Select * from app_sellprices_amount where item_id = '{$item['id']}' && name_id = '{$price['id']}' && type = '1'")->fetch_assoc()['price']+0;
+                                                            $cprice = isset($price_values[$price['id']]) ? ($price_values[$price['id']] + 0) : 0;
                                                             ?>
                                                             <div class="col-6">
                                                                 <div class="form-group">
