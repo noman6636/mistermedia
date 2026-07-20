@@ -6,15 +6,19 @@ if(!isset($_SESSION['admin_id'])){
     exit();
 }
 
-if(!isset($_POST['sku']) || empty($_POST['sku'])){
+if(!isset($_POST['sku']) || empty(trim($_POST['sku']))){
     exit();
 }
+
+$sku = trim($_POST['sku']);
+$sku_escaped = $conn->real_escape_string($sku);
+
 $type = '';
-$check_sku_item = $conn->query("SELECT * FROM app_items WHERE sku = '{$_POST['sku']}' AND item_type = 1 ");
-$check_sku_packages = $conn->query("SELECT * FROM app_packages WHERE sku = '{$_POST['sku']}'");
-if($check_sku_item->num_rows > 0){
+$check_sku_item = $conn->query("SELECT * FROM app_items WHERE sku = '{$sku_escaped}' AND item_type = 1 LIMIT 1");
+$check_sku_packages = $conn->query("SELECT * FROM app_packages WHERE sku = '{$sku_escaped}' LIMIT 1");
+if($check_sku_item && $check_sku_item->num_rows > 0){
    $type = 'item'; 
-}elseif($check_sku_packages->num_rows > 0){
+}elseif($check_sku_packages && $check_sku_packages->num_rows > 0){
     $type = 'package'; 
 }
 ?>
@@ -39,14 +43,14 @@ if($check_sku_item->num_rows > 0){
             <div class="col-12">
                 <div class="breadcrumb-wrapper">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item" style="font-size: 30px;"><?php echo strtoupper($_POST['sku']); ?></a>
+                        <li class="breadcrumb-item" style="font-size: 30px;"><?php echo htmlspecialchars(strtoupper($sku), ENT_QUOTES, 'UTF-8'); ?></a>
                         </li>
                         <?php if(in_array(15, $permissions_allow)){ ?>
                                                                 <?php if($type == 'item'){ ?>
                                                                     <button type="button" class="btn btn-primary" onclick="saveItem();" style="margin-left: auto;">Save changes</button>
                                                                 <?php } ?>
                                                                 <?php if($type == 'package'){ ?>
-                                                                    <input type="hidden" name="edit_package" value="<?=$_POST['sku'];?>" />
+                                                                    <input type="hidden" name="edit_package" value="<?=htmlspecialchars($sku, ENT_QUOTES, 'UTF-8');?>" />
                                                                     <button type="submit" class="btn btn-primary" style="margin-left: auto;">Save changes</button>
                                                                 <?php } ?>
                                                                 
@@ -77,8 +81,6 @@ if($check_sku_item->num_rows > 0){
                                             <?php 
                                             $item = $check_sku_item->fetch_assoc();
                                             $remain_stock = getStock($conn, $item['id'], $item['sku']);
-                                            $pckg = @$package['sku'] ?? null;
-                                            $orders = $conn->query("SELECT * FROM app_order_items a, app_orders b WHERE b.OrderID = a.OrderID && b.IsArchived = 0 && a.SKU = '{$pckg}'")->num_rows;
                                             ?>
                                             
                                             <form class="" id="itemForm" action="" method="post" enctype="multipart/form-data" autocomplete="off">
@@ -378,6 +380,12 @@ input[type="number"] {
 
 
 </div>
+<?php }else{ ?>
+    <div class="content-body">
+        <div class="alert alert-warning" role="alert">
+            <div class="alert-body">No item/package found for selected SKU.</div>
+        </div>
+    </div>
 <?php } ?>
 <script>
     function incrementValue(e) {
@@ -437,8 +445,8 @@ function newPrice(){
                           theme: "metroui",
                           type: 'success',
                           killer: true
-                        }).on('onClose', function() {
-                          viewItemPage('<?php echo $item['sku']; ?>');
+                                                }).on('onClose', function() {
+                                                    viewItemPage(<?php echo json_encode($item['sku'] ?? ''); ?>);
                     }).show();
                     
                  }else{
@@ -475,7 +483,7 @@ function updatevalue(val){
     $.ajax({
 		url:"inc/ajax.php",
 		type: "POST",
-		data: 'updateqty='+val+'&item_id='+<?php echo $item['id']; ?>,
+        data: 'updateqty='+val+'&item_id='+<?php echo (int)($item['id'] ?? 0); ?>,
 		success: function(res) {
 		    console.log(res);
 			new Noty({
@@ -538,7 +546,7 @@ function change_image(){
         // Check file selected or not
         if(files.length > 0 ){
            fd.append('item_image',files[0]);
-           fd.append('item_id',"<?php echo $item['id']; ?>");
+           fd.append('item_id',"<?php echo (int)($item['id'] ?? 0); ?>");
 
            $.ajax({
               url:"inc/ajax.php",

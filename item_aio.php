@@ -256,12 +256,18 @@ img {
             
             <div class="col-12" style="height: calc(100vh - 200px);overflow: scroll;">
                 <table width="100%" id="item_sku"  class="table table-bordered">
-                    <?php $items = $conn->query("SELECT * FROM (select sku, image from app_items where deleted = 0  AND item_type = 1 UNION SELECT sku, '' as image from app_packages where deleted = 0 && id < 1) A WHERE sku != ''order by sku ASC");
-                           while($item = $items->fetch_assoc()){
-                           $sku = $item['sku'];?>
+                    <?php
+                    $items = $conn->query("SELECT sku, image FROM app_items WHERE deleted = 0 AND item_type = 1 AND sku != '' ORDER BY sku ASC");
+                    $first_sku = '';
+                    while($item = $items->fetch_assoc()){
+                        $sku = $item['sku'];
+                        if($first_sku === ''){
+                            $first_sku = $sku;
+                        }
+                    ?>
                                                                                      
-                    <tr style="cursor: pointer;" onclick="viewItemPage('<?=$sku;?>')">
-                        <td style="padding: 5px;display: flex;align-items: center;"><img src="items_image/<?php if($item['image']!=''){ ?><?=$item['image']; }else{ echo '54818317.png'; } ?>" style="width: 30px;margin-right: 10px;"/> <?=$item['sku'];?></td>
+                    <tr style="cursor: pointer;" onclick='viewItemPage(<?=json_encode($sku);?>)'>
+                        <td style="padding: 5px;display: flex;align-items: center;"><img src="items_image/<?php if($item['image']!=''){ ?><?=htmlspecialchars($item['image'], ENT_QUOTES, 'UTF-8'); }else{ echo '54818317.png'; } ?>" style="width: 30px;margin-right: 10px;"/> <?=htmlspecialchars($item['sku'], ENT_QUOTES, 'UTF-8');?></td>
                     </tr>
                     
                     <?php } ?>
@@ -358,7 +364,14 @@ img {
           }
         }
          
+        var initialSku = <?php echo json_encode($first_sku); ?>;
+
         function viewItemPage(sku){
+            if(!sku){
+                $("#loading").html("<h4>No SKU found.</h4>");
+                return;
+            }
+
             $("#databox").hide();
     		$("#loading").show();
             $("#loading").html("<img src='assets/ajax_loading.gif' />");
@@ -366,15 +379,32 @@ img {
     			url:"item_aio_ajax.php",
     			dataType: "html",
     			type: "POST",
-    			data: 'sku='+sku,
-    			success: function(res) {
-    			 //   console.log(res);
-    				$("#databox").html(res);
-    				$("#databox").show();
-    				$("#loading").hide();
-    			}
-		    });
+				data: { sku: sku },
+				timeout: 30000
+		    })
+            .done(function(res) {
+				$("#databox").html(res);
+				$("#databox").show();
+		    })
+            .fail(function(xhr, status) {
+                var message = status === 'timeout' ? 'Request timeout. Please try again.' : 'Failed to load item details.';
+                if(xhr.responseText && xhr.responseText.trim() !== ''){
+                    message = 'Unable to load item details. Server returned an error.';
+                }
+                $("#loading").html("<div class='alert alert-danger' role='alert'><div class='alert-body'>" + message + "</div></div>");
+            })
+            .always(function(){
+                if($("#databox").is(":visible")){
+                    $("#loading").hide();
+                }
+            });
         }
+
+        $(document).ready(function(){
+            if(initialSku){
+                viewItemPage(initialSku);
+            }
+        });
         
         
     
