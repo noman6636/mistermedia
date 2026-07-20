@@ -432,16 +432,37 @@ $('.input-group').on('click', '.button-minus', function(e) {
 });
 <?php if($type=='item'){ ?>
 
+function notifyMsg(text, type) {
+    new Noty({
+        text: text,
+        modal: true,
+        timeout: 3500,
+        layout: 'bottomRight',
+        theme: 'metroui',
+        type: type || 'warning',
+        killer: true
+    }).show();
+}
+
+function parseJsonSafe(responseText) {
+    if (typeof responseText === 'object' && responseText !== null) {
+        return responseText;
+    }
+    try {
+        return JSON.parse(responseText);
+    } catch (e) {
+        return null;
+    }
+}
+
 function newPrice(){
     $(".preloader").show();
      $.ajax({
-		url:"inc/ajax",
+		url:"inc/ajax.php",
 		type: "POST",
+		dataType: "json",
 		data: $("#addnewPrice").serialize(),
-		success: function(response) {
-		    console.log(response);
-		    $('.preloader').fadeOut('slow');
-		    res = JSON.parse(response);
+		success: function(res) {
 		    if(res.status =='success'){
 		         $('#addPriceForm .close').click();
                    new Noty({
@@ -457,18 +478,16 @@ function newPrice(){
                     }).show();
                     
                  }else{
-                    new Noty({
-                          text: res.msg,
-                          modal: true,
-                          timeout: 3000,
-                          layout: 'bottomRight',
-                          theme: "metroui",
-                          type: 'warning',
-                          killer: true
-                        // }).on('onClose', function() {
-                        //   window.location.href = 'user/index.php';
-                    }).show();
+                    notifyMsg(res.msg || 'Unable to add price tag.', 'warning');
                  }
+		},
+        error: function(xhr) {
+            var data = parseJsonSafe(xhr.responseText);
+            var msg = (data && data.msg) ? data.msg : (xhr.responseText || 'Request failed while adding price tag.');
+            notifyMsg(msg, 'warning');
+		},
+        complete: function() {
+            $('.preloader').fadeOut('slow');
 		}
     });
     return false;
@@ -492,18 +511,12 @@ function updatevalue(val){
 		type: "POST",
         data: 'updateqty='+val+'&item_id='+<?php echo (int)($item['id'] ?? 0); ?>,
 		success: function(res) {
-		    console.log(res);
-			new Noty({
-              text: "Quantity updated succesfully.",
-              modal: true,
-              timeout: 3000,
-              layout: 'bottomRight',
-              theme: "metroui",
-              type: 'success',
-              killer: true
-            // }).on('onClose', function() {
-            //   window.location.href = 'user/index.php';
-            }).show();
+		    notifyMsg("Quantity updated successfully.", 'success');
+		},
+        error: function(xhr) {
+            var data = parseJsonSafe(xhr.responseText);
+            var msg = (data && data.msg) ? data.msg : (xhr.responseText || 'Quantity update failed.');
+            notifyMsg(msg, 'warning');
 		}
     });
 }
@@ -512,36 +525,22 @@ function saveItem(){
     $.ajax({
 		url:"inc/ajax.php",
 		type: "POST",
+		dataType: "json",
 		data: $("#itemForm").serialize(),
-		success: function(response) {
-		    console.log(response);
-		    $('.preloader').fadeOut('slow');
-		    res = JSON.parse(response);
+		success: function(res) {
 		    if(res.status =='success'){
-                   new Noty({
-                          text: res.msg,
-                          modal: true,
-                          timeout: 3000,
-                          layout: 'bottomRight',
-                          theme: "metroui",
-                          type: 'success',
-                          killer: true
-                        // }).on('onClose', function() {
-                        //   window.location.href = 'user/index.php';
-                    }).show();
+                    notifyMsg(res.msg || 'Item updated successfully.', 'success');
                  }else{
-                    new Noty({
-                          text: res.msg,
-                          modal: true,
-                          timeout: 3000,
-                          layout: 'bottomRight',
-                          theme: "metroui",
-                          type: 'warning',
-                          killer: true
-                        // }).on('onClose', function() {
-                        //   window.location.href = 'user/index.php';
-                    }).show();
+                    notifyMsg(res.msg || 'Unable to save item.', 'warning');
                  }
+		},
+        error: function(xhr) {
+            var data = parseJsonSafe(xhr.responseText);
+            var msg = (data && data.msg) ? data.msg : (xhr.responseText || 'Save request failed.');
+            notifyMsg(msg, 'warning');
+		},
+        complete: function() {
+            $('.preloader').fadeOut('slow');
 		}
     });
 }
@@ -559,41 +558,27 @@ function change_image(){
               url:"inc/ajax.php",
               type: 'post',
               data: fd,
+                  dataType: 'json',
               enctype: 'multipart/form-data',
               contentType: false,
               processData: false,
-              success: function(response){
-                  console.log(response)
-                  res = JSON.parse(response);
-                  $('.preloader').fadeOut('slow');
+                  success: function(res){
                  if(res.status =='success'){
                     $("#image_view").attr("src",res.msg); 
                     $('#item_image').val(null);
-                    new Noty({
-                          text: "Image updated successfully",
-                          modal: true,
-                          timeout: 3000,
-                          layout: 'bottomRight',
-                          theme: "metroui",
-                          type: 'success',
-                          killer: true
-                        // }).on('onClose', function() {
-                        //   window.location.href = 'user/index.php';
-                    }).show();
+                          notifyMsg('Image updated successfully', 'success');
                  }else{
-                    new Noty({
-                          text: res.msg,
-                          modal: true,
-                          timeout: 3000,
-                          layout: 'bottomRight',
-                          theme: "metroui",
-                          type: 'warning',
-                          killer: true
-                        // }).on('onClose', function() {
-                        //   window.location.href = 'user/index.php';
-                    }).show();
+                          notifyMsg(res.msg || 'Unable to update image.', 'warning');
                  }
               },
+                  error: function(xhr){
+                        var data = parseJsonSafe(xhr.responseText);
+                        var msg = (data && data.msg) ? data.msg : (xhr.responseText || 'Image upload failed.');
+                        notifyMsg(msg, 'warning');
+                  },
+                  complete: function(){
+                        $('.preloader').fadeOut('slow');
+                  }
            });
         }else{
         //   alert("Please select a file.");
