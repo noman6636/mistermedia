@@ -3,6 +3,24 @@
 ob_start();
 
 function getClientIpAddress() {
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        return trim((string)$_SERVER['HTTP_CF_CONNECTING_IP']);
+    }
+
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $forwarded = explode(',', (string)$_SERVER['HTTP_X_FORWARDED_FOR']);
+        foreach ($forwarded as $candidateIp) {
+            $candidateIp = trim($candidateIp);
+            if ($candidateIp !== '' && filter_var($candidateIp, FILTER_VALIDATE_IP)) {
+                return $candidateIp;
+            }
+        }
+    }
+
+    if (!empty($_SERVER['HTTP_X_REAL_IP']) && filter_var($_SERVER['HTTP_X_REAL_IP'], FILTER_VALIDATE_IP)) {
+        return trim((string)$_SERVER['HTTP_X_REAL_IP']);
+    }
+
     return $_SERVER['REMOTE_ADDR'] ?? '';
 }
 
@@ -28,9 +46,8 @@ function getIpNetworkHint($ipAddress) {
 
 function buildSessionFingerprint() {
     $ip = getClientIpAddress();
-    $ipHint = getIpNetworkHint($ip);
     $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-    return hash('sha256', $ipHint . '|' . $userAgent);
+    return hash('sha256', $ip . '|' . $userAgent);
 }
 
 function destroyCurrentSession() {
@@ -70,6 +87,28 @@ function enforceAuthenticatedSessionIntegrity() {
     if (!isset($_SESSION['admin_id'])) {
         return;
     }
+
+    $maxAuthenticatedSessionAge = 3600;
+    $now = time();
+
+    if (!isset($_SESSION['auth_started_at']) || !is_numeric($_SESSION['auth_started_at'])) {
+        $_SESSION['auth_started_at'] = $now;
+    }
+
+    if (!isset($_SESSION['last_activity']) || !is_numeric($_SESSION['last_activity'])) {
+        $_SESSION['last_activity'] = $now;
+    }
+
+    $authStartedAt = (int)$_SESSION['auth_started_at'];
+    $lastActivity = (int)$_SESSION['last_activity'];
+
+    // Expire authenticated sessions after 1 hour from login or idle activity.
+    if (($now - $authStartedAt) > $maxAuthenticatedSessionAge || ($now - $lastActivity) > $maxAuthenticatedSessionAge) {
+        destroyCurrentSession();
+        return;
+    }
+
+    $_SESSION['last_activity'] = $now;
 
     $currentFingerprint = buildSessionFingerprint();
     if (!isset($_SESSION['auth_fingerprint'])) {
@@ -179,6 +218,10 @@ if (isset($_SESSION['admin_id'])) {
             }
         }
     }
+}
+
+if (isset($_SESSION['admin_id']) && $admin === null) {
+    destroyCurrentSession();
 }
 
 // Load application settings

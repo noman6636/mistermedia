@@ -207,8 +207,35 @@ function check_add_item($conn, $sku, $name, $price) {
     $updatePackagesStmt->execute();
 }
 
-function addSystemLog($conn, $action, $description, $details) {
-    $admin_id = (int)$_SESSION["admin_id"];
+function addSystemLog($conn, $action, $description, $details, $adminIdOverride = null) {
+    if (!($conn instanceof mysqli)) {
+        return false;
+    }
+
+    $admin_id = 0;
+    if ($adminIdOverride !== null) {
+        $admin_id = (int)$adminIdOverride;
+    } elseif (isset($_SESSION["admin_id"])) {
+        $admin_id = (int)$_SESSION["admin_id"];
+    }
+
+    if ($admin_id <= 0) {
+        return false;
+    }
+
+    $checkStmt = $conn->prepare("SELECT id FROM app_admins WHERE id = ? LIMIT 1");
+    if (!$checkStmt) {
+        return false;
+    }
+    $checkStmt->bind_param('i', $admin_id);
+    $checkStmt->execute();
+    $adminExists = $checkStmt->get_result()->num_rows > 0;
+    $checkStmt->close();
+
+    if (!$adminExists) {
+        return false;
+    }
+
     $now = date("Y-m-d H:i:s", strtotime(" + 4 hours"));
     $ip_address = get_client_ip();
     $agent = $_SERVER["HTTP_USER_AGENT"] ?? '';
@@ -227,7 +254,10 @@ function addSystemLog($conn, $action, $description, $details) {
         agent = ?"
     );
     $stmt->bind_param('issssssss', $admin_id, $now, $action, $description, $details, $ip_address, $address, $device, $agent);
-    $stmt->execute();
+    $result = $stmt->execute();
+    $stmt->close();
+
+    return $result;
 }
 
 function getMessageTextFromContent($htmlContent) {

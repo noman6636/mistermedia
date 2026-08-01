@@ -159,6 +159,8 @@ if (isset($_POST['username'], $_POST['password'])) {
     $_SESSION['admin_id'] = $adminDtl['id'];
     $_SESSION['auth_fingerprint'] = buildSessionFingerprint();
     $_SESSION['admin_auth_version'] = getAdminPasswordVersion($effectivePasswordHash);
+    $_SESSION['auth_started_at'] = time();
+    $_SESSION['last_activity'] = time();
     clearLoginFailures($username);
 
     addSystemLog($conn, 'LOGIN', 'User Logged in to System', '');
