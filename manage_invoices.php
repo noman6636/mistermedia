@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -16,7 +17,7 @@ if(!in_array(32, $permissions_allow)){
 
 
 if(isset($_GET['delete_invoice'])){
-    $id = $_GET['delete_invoice'];
+    $id = (int)$_GET['delete_invoice'];
         
         $conn->query("DELETE FROM app_invoices where id = '$id'");
         $conn->query("DELETE FROM app_invoices_details where invoice_id = '$id'");

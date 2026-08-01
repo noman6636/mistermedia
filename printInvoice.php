@@ -4,6 +4,12 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
+}
+
+if(!in_array(32, $permissions_allow)){
+    header("location: index.php");
+    exit();
 }
 
 $accountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;
@@ -176,10 +182,10 @@ $invoiceCode = $accountId . '-' . date('mdY', $frmTs) . date('mdY', $toTs);
         	        <tr>
         	            <td><?=$sn;?></td>
         	            <td><?=date('Y-m-d', strtotime($order['CreatedTime']));?></td>
-        	            <td><?=$order['OrderID'];?></td>
-        	            <td><?=$order['SellingManagerSalesRecordNumber'];?></td>
-        	            <td><?=$order['Reference'];?></td>
-        	            <td><?=$order['SKU'];?></td>
+        	            <td><?=htmlspecialchars($order['OrderID'], ENT_QUOTES, 'UTF-8');?></td>
+        	            <td><?=htmlspecialchars($order['SellingManagerSalesRecordNumber'], ENT_QUOTES, 'UTF-8');?></td>
+        	            <td><?=htmlspecialchars($order['Reference'], ENT_QUOTES, 'UTF-8');?></td>
+        	            <td><?=htmlspecialchars($order['SKU'], ENT_QUOTES, 'UTF-8');?></td>
         	            <td style="text-align: center"><?=$order['QuantityPurchased'];?></td>
         	            <td style="text-align: right"><?=($order['QuantityPurchased']*$order['Price']);?></td>
         	        </tr>

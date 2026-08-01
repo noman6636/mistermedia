@@ -4,6 +4,20 @@ ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
 require_once "inc/config.php";
+require_once "inc/functions.php";
+
+if (empty($_SESSION['admin_id'])) {
+    http_response_code(401);
+    echo "Unauthorized";
+    exit;
+}
+
+if (!in_array(38, $permissions_allow)) {
+    http_response_code(403);
+    echo "Forbidden";
+    exit;
+}
+
 // Validate ID
 if (!isset($_POST['id'])) {
     echo "ID missing";

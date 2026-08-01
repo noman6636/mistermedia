@@ -4,9 +4,20 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
-if($_GET['type']==1){ 
+// Normalize request-controlled identifiers to safe values before they are
+// interpolated into SQL anywhere below (account_id/item_id are otherwise
+// only ever compared against the literal string 'all').
+if(isset($_GET['account_id']) && $_GET['account_id'] !== 'all'){
+    $_GET['account_id'] = (string)(int)$_GET['account_id'];
+}
+if(isset($_GET['item_id']) && $_GET['item_id'] !== 'all'){
+    $_GET['item_id'] = implode(',', array_map('intval', explode(',', $_GET['item_id'])));
+}
+
+if($_GET['type']==1){
     
     if($_GET['item_id']=='all'){
         $item = "ALL";

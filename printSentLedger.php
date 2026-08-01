@@ -4,8 +4,18 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
+if(isset($_GET['account_id']) && $_GET['account_id'] !== 'all'){
+    $_GET['account_id'] = (string)(int)$_GET['account_id'];
+}
+if(isset($_GET['frmdate'])){
+    $_GET['frmdate'] = date('Y-m-d', strtotime($_GET['frmdate']));
+}
+if(isset($_GET['todate'])){
+    $_GET['todate'] = date('Y-m-d', strtotime($_GET['todate']));
+}
 
 ?>
 <!DOCTYPE html>

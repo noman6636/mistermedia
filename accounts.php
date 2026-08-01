@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(2, $permissions_allow)){
@@ -69,7 +70,7 @@ if(isset($_POST['account_action'], $_POST['account_id'])){
 }
 
 if(isset($_POST['edit'])){
-    $editId = $_POST['edit'];
+    $editId = (int)$_POST['edit'];
     $account_name = $conn->real_escape_string($_POST['account_name']);
     $phone = $conn->real_escape_string($_POST['phone']);
     $email = $conn->real_escape_string($_POST['email']);
@@ -96,11 +97,11 @@ if(isset($_POST['edit'])){
 }
 
 if(isset($_POST['payout_to_payment'])){
-    $account_id = $_POST['accountId'];
-    $amount = $_POST['amount'];
-    
+    $account_id = (int)$_POST['accountId'];
+    $amount = (float)$_POST['amount'];
+
     $type = $_POST['type'];
-    
+
     if($amount > 0){
         
         if($type=='auto'){

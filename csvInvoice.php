@@ -4,6 +4,12 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
+}
+
+if(!in_array(32, $permissions_allow)){
+    header("location: index.php");
+    exit();
 }
 
 $accountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;

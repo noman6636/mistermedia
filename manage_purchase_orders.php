@@ -5,6 +5,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -182,7 +183,8 @@ if(isset($_GET['create_purchase'])){
                                         <?php 
                                         
                                         if(isset($_GET['item_id'])){
-                                            $purchases = $conn->query("select * from app_purchase_orders where id IN (SELECT purchase_id FROM app_purchase_orders_detail where item_id = '{$_GET['item_id']}') order by id desc");
+                                            $safeItemId = (int)$_GET['item_id'];
+                                            $purchases = $conn->query("select * from app_purchase_orders where id IN (SELECT purchase_id FROM app_purchase_orders_detail where item_id = '$safeItemId') order by id desc");
                                         }else{
                                             $purchases = $conn->query("select * from app_purchase_orders order by id desc");
                                         }

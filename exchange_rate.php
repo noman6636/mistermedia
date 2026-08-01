@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(36, $permissions_allow)){
@@ -14,16 +15,19 @@ if(!in_array(36, $permissions_allow)){
 
 
 if(isset($_POST['update_rate'])){
-    $rate = $conn->real_escape_string($_POST['rate']);
+    $rate = (float)$_POST['rate'];
     $last_updated = date('Y-m-d H:i:s');
-    
+
     $exchangeRate = array();
     $exchangeRate['rate'] = $rate;
     $exchangeRate['last_updated'] = $last_updated;
     $exchangeRate['updated'] = 1;
-    
-    $exchangeRate = json_encode($exchangeRate);
-    
+
+    // Escape AFTER json_encode, not before — escaping the raw $rate first and
+    // then re-encoding it doubles the escape backslashes and can unescape the
+    // closing quote, breaking out of the SQL string literal.
+    $exchangeRate = $conn->real_escape_string(json_encode($exchangeRate));
+
     $conn->query("update app_settings set value = '$exchangeRate' where name = 'exchange_rate'");
     addSystemLog($conn, 'EXCHANGE RATE UPDATED', "New exchange rate has been set to $rate", "");
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Exchange rate updated successfully.</div></div>';

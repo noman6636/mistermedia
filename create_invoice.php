@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -17,7 +18,7 @@ if(!in_array(33, $permissions_allow)){
 if(isset($_POST['create_invoice'])){
     $company_id = $conn->real_escape_string(trim($_POST['company_id']));
     $date = date('Y-m-d', strtotime($_POST['date']));
-    $total_amount = $_POST['fld_grand_total_amount'];
+    $total_amount = $conn->real_escape_string($_POST['fld_grand_total_amount']);
     $name = $conn->real_escape_string(trim($_POST['name']));
     $email = $conn->real_escape_string(trim($_POST['email']));
     $address = $conn->real_escape_string(trim($_POST['address']));
@@ -33,9 +34,11 @@ if(isset($_POST['create_invoice'])){
     $pquery = "INSERT INTO app_invoices SET company_id = '$company_id', date = '$date', name = '$name', email = '$email', address = '$address', phone = '$phone', total_amount = '$total_amount', datetime='$now'";
     if($conn->query($pquery)){
         $invoice_id = $conn->insert_id;
+        $detailStmt = $conn->prepare("INSERT INTO app_invoices_details SET invoice_id = ?, title = ?, qty = ?, price = ?, amount = ?");
         for ($i = 0, $n = count($title); $i < $n; $i++) {
             if($qtys[$i] > 0){
-			    $conn->query("INSERT INTO app_invoices_details SET invoice_id = '$invoice_id', title = '{$title[$i]}', qty = '{$qtys[$i]}', price = '{$prices[$i]}', amount = '{$totals[$i]}'");
+			    $detailStmt->bind_param('issss', $invoice_id, $title[$i], $qtys[$i], $prices[$i], $totals[$i]);
+			    $detailStmt->execute();
             }
         }
         addSystemLog($conn, 'INVOICE CREATED', "New Invoice ($invoice_id) has been created", "");

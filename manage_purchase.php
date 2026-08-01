@@ -389,7 +389,8 @@ table.dataTable {
                                             <tbody>
                                                 <?php
                                                 if (isset($_GET['item_id'])) {
-                                                    $purchases = $conn->query("select * from app_purchase where id IN (SELECT purchase_id FROM app_purchase_detail where item_id = '{$_GET['item_id']}' && status = 0) order by id desc");
+                                                    $safeItemId = (int)$_GET['item_id'];
+                                                    $purchases = $conn->query("select * from app_purchase where id IN (SELECT purchase_id FROM app_purchase_detail where item_id = '$safeItemId' && status = 0) order by id desc");
                                                 } else {
                                                     $purchases = $conn->query("select * from app_purchase order by id desc");
                                                 }

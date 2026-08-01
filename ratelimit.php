@@ -1,7 +1,22 @@
-<?php 
+<?php
+require_once "inc/config.php";
+require_once "inc/functions.php";
 
-$clientId = 'Smartfut-EcomsTra-PRD-0a70f81c3-5683cf7c';
-$clientSecret = 'PRD-a70f81c32c7a-830b-4fae-8b0d-e55a';
+// Diagnostic script — never publicly reachable. Requires an authenticated
+// admin session (matching every other internal tool in this app) since it
+// exchanges live eBay API credentials for an access token on every request.
+if (!isset($_SESSION['admin_id'])) {
+    http_response_code(403);
+    exit('Forbidden');
+}
+
+// Read from environment variables first; the hardcoded fallbacks exist only
+// so this script keeps working until real env vars are configured on the
+// server. Remove the fallbacks once EBAY_APP_ID/EBAY_CERT_ID are set, and
+// rotate these keys since they were previously committed to source control
+// in plaintext.
+$clientId = getenv('EBAY_APP_ID') ?: 'Smartfut-EcomsTra-PRD-0a70f81c3-5683cf7c';
+$clientSecret = getenv('EBAY_CERT_ID') ?: 'PRD-a70f81c32c7a-830b-4fae-8b0d-e55a';
 $apiEndpoint = 'https://api.ebay.com/developer/analytics/v1_beta/public/rate_limit';
 
 // === Get Access Token (Client Credentials) ===

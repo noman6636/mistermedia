@@ -4,10 +4,16 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
+}
+
+if(!in_array(19, $permissions_allow)){
+    header("location: index.php");
+    exit();
 }
 
 if(isset($_GET['id'])){
-    $pid = $_GET['id'];
+    $pid = (int)$_GET['id'];
     $package = $conn->query("SELECT * FROM app_packages where id = '$pid'");
     if($package->num_rows > 0){
         $package = $package->fetch_assoc();
@@ -23,7 +29,7 @@ if(isset($_GET['id'])){
 
 
 if(isset($_POST['update_package'])){
-    $editId = $_GET['id'];
+    $editId = $pid;
     $sku = $conn->real_escape_string(trim($_POST['sku']));
     $old_sku = $conn->real_escape_string(trim($_POST['old_sku']));
     $name = $conn->real_escape_string(trim($_POST['name']));
@@ -40,25 +46,32 @@ if(isset($_POST['update_package'])){
     
     $price = $_POST['price'];
     $name_id = $_POST['name_id'];
-    $st = $price[0];
-   
+    $st = $conn->real_escape_string($price[0]);
+
     $conn->query("UPDATE app_packages SET sku = '$sku', name = '$name', price = '$st', packing_size_id = '$packing_size_id' WHERE id = '$editId'");
-    
-    
+
+
     if($sku != $old_sku){
         $conn->query("update app_order_items set SKU = '$sku' where SKU = '$old_sku'");
     }
+    $checkPriceTagStmt = $conn->prepare("select * from app_sellprices_amount where name_id = ? && item_id = ? && type = '2'");
+    $updatePriceStmt = $conn->prepare("update app_sellprices_amount set price = ? where name_id = ? && item_id = ? && type = '2'");
+    $insertPriceStmt = $conn->prepare("insert into app_sellprices_amount set item_id = ?, name_id = ?, price = ?, type = '2'");
     for ($i = 0, $n = count($price); $i < $n; $i++) {
         if(!empty($price[$i])){
-            $check_price_tag = $conn->query("select * from app_sellprices_amount where name_id = '{$name_id[$i]}' && item_id = '$editId' && type = '2'");
+            $checkPriceTagStmt->bind_param('si', $name_id[$i], $editId);
+            $checkPriceTagStmt->execute();
+            $check_price_tag = $checkPriceTagStmt->get_result();
             if($check_price_tag->num_rows > 0){
-                $conn->query("update app_sellprices_amount set price = '{$price[$i]}' where name_id = '{$name_id[$i]}' && item_id = '$editId'  && type = '2'");
-               
+                $updatePriceStmt->bind_param('ssi', $price[$i], $name_id[$i], $editId);
+                $updatePriceStmt->execute();
+
             }else{
-                $conn->query("insert into app_sellprices_amount set item_id = '$editId', name_id = '{$name_id[$i]}', price = '{$price[$i]}', type = '2'");
+                $insertPriceStmt->bind_param('iss', $editId, $name_id[$i], $price[$i]);
+                $insertPriceStmt->execute();
             }
         }
-        
+
     }
     
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Package updated successfully.</div></div>';

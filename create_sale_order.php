@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -51,7 +52,7 @@ if(isset($_POST['create_sale'])){
     $account = $conn->real_escape_string(trim($_POST['account']));
     $reference = $conn->real_escape_string(trim($_POST['reference']));
     $date = date('Y-m-d H:i:s', strtotime($_POST['date']));
-    $total_amount = $_POST['fld_grand_total_amount'];
+    $total_amount = $conn->real_escape_string($_POST['fld_grand_total_amount']);
     $order_id = strtotime(date('Y-m-d H:i:s')).'-'.rand(0,9).rand(0,9).rand(0,9).rand(0,9);
     $shipping_name = $conn->real_escape_string(trim($_POST['shipping_name']));
     $shipping_street1 = $conn->real_escape_string(trim($_POST['shipping_street1']));
@@ -83,10 +84,12 @@ if(isset($_POST['create_sale'])){
     $pquery = "INSERT INTO app_orders SET AccountID = '$account', OrderID = '$order_id', OrderStatus = 'Completed', PaymentMethod = 'D-Orders', PaymentStatus = 'Complete', CreatedTime = '$date', Subtotal = '$total_amount', Total = '$total_amount', ShippingAddress = '$shippingAddress', PostCode = '$shipping_postalcode', Reference = '$reference', OrderType = '2', IsPrinted = '1', IsDispatched = '1', IsRespond = '1'";
     if($conn->query($pquery)){
         
+        $orderItemStmt = $conn->prepare("INSERT INTO app_order_items SET OrderID = ?, SKU = ?, ItemTitle = ?, QuantityPurchased = ?, Price = ?, OrderType = '2'");
         for ($i = 0, $n = count($items); $i < $n; $i++) {
             if($qtys[$i] > 0){
-			    $title = $conn->real_escape_string(getTitleFromSKU($conn, $items[$i]));
-			    $conn->query("INSERT INTO app_order_items SET OrderID = '$order_id', SKU = '{$items[$i]}', ItemTitle = '$title', QuantityPurchased = '{$qtys[$i]}', Price = '{$prices[$i]}', OrderType = '2'");
+			    $title = getTitleFromSKU($conn, $items[$i]);
+			    $orderItemStmt->bind_param('sssss', $order_id, $items[$i], $title, $qtys[$i], $prices[$i]);
+			    $orderItemStmt->execute();
             }
         }
         addSystemLog($conn, 'SALE ORDER CREATED', "New sale order with no ($order_id) has been created.", "");

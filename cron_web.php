@@ -46,20 +46,28 @@ foreach($ordersArray as $order){
     $shippingAddress['PostalCode'] = $billing_details['zipcode'];
     $order_id = strtotime($orderdetail['created_date']).'-WEB-'.$orderdetail['id'];
     $shippingAddress = $conn->real_escape_string(json_encode($shippingAddress));
+    $createdDate = $conn->real_escape_string($orderdetail['created_date']);
+    $totalAmount = $conn->real_escape_string($orderdetail['total_amount']);
+    $postCode = $conn->real_escape_string($billing_details['zipcode']);
+    $buyerName = $conn->real_escape_string($orderdetail['customer_name']);
+    $buyerEmail = $conn->real_escape_string($orderdetail['customer_email']);
     $accountRow = $conn->query("SELECT * FROM app_accounts where id = '179'")->fetch_assoc();
-    
+
     $check_order = $conn->query("SELECT * FROM app_orders where OrderID = '$order_id'");
     // echo $orderdetail['total_amount'];
     if($check_order->num_rows == 0){
-        $pquery = "INSERT INTO app_orders SET AccountID = '179', OrderID = '$order_id', OrderStatus = 'Completed', PaymentMethod = 'DChannel', PaymentStatus = 'Complete', CreatedTime = '{$orderdetail['created_date']}', Subtotal = '{$orderdetail['total_amount']}', Total = '{$orderdetail['total_amount']}', ShippingAddress = '$shippingAddress', PostCode = '{$billing_details['zipcode']}', BuyerUserID = '{$orderdetail['customer_name']}', BuyerEmail = '{$orderdetail['customer_email']}', OrderType = '3'";
-   
+        $pquery = "INSERT INTO app_orders SET AccountID = '179', OrderID = '$order_id', OrderStatus = 'Completed', PaymentMethod = 'DChannel', PaymentStatus = 'Complete', CreatedTime = '$createdDate', Subtotal = '$totalAmount', Total = '$totalAmount', ShippingAddress = '$shippingAddress', PostCode = '$postCode', BuyerUserID = '$buyerName', BuyerEmail = '$buyerEmail', OrderType = '3'";
+
         if($conn->query($pquery)){
             foreach($order['orderedproducts'] as $product){
                 check_add_item($conn, $product['sku'], $product['name'], $product['unit_price']);
                 $UnitPrice = getPriceFromSKU($conn, $product['sku'], $accountRow['price_tag']);
-                $conn->query("INSERT INTO app_order_items SET OrderID = '$order_id', SKU = '{$product['sku']}', ItemTitle = '{$product['name']}', QuantityPurchased = '{$product['orderquantity']}', Price = '$UnitPrice', OrderType = '3'");
+                $sku = $conn->real_escape_string($product['sku']);
+                $itemTitle = $conn->real_escape_string($product['name']);
+                $qty = $conn->real_escape_string($product['orderquantity']);
+                $conn->query("INSERT INTO app_order_items SET OrderID = '$order_id', SKU = '$sku', ItemTitle = '$itemTitle', QuantityPurchased = '$qty', Price = '$UnitPrice', OrderType = '3'");
             }
-                                        
+
         }else{
             echo $conn->error;
         }

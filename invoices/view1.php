@@ -4,6 +4,7 @@ require_once "../inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
     exit;
 }
 
@@ -13,7 +14,7 @@ if(!in_array(32, $permissions_allow)){
     exit();
 }
 if(isset($_GET['id'])){
-    $id = $_GET['id'];
+    $id = (int)$_GET['id'];
     $invoice = $conn->query("SELECT * FROM app_invoices WHERE id = '$id'");
     if($invoice->num_rows > 0){
         $invoice = $invoice->fetch_assoc();

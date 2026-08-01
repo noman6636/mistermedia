@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 $accountId = isset($_GET['account_id']) ? (int)$_GET['account_id'] : 0;

@@ -12,10 +12,13 @@ if(isset($_GET['getLiveStock'])){
     $skus = $_POST['sku_list'];
     $skuDataList = array();
     if(is_array($skus)){
+        $skuStmt = $conn->prepare("SELECT * FROM app_items WHERE sku = ?");
         foreach($skus as $sku){
             $skuData = array();
             $skuData['sku']=$sku;
-            $item = $conn->query("SELECT * FROM app_items WHERE sku = '$sku'");
+            $skuStmt->bind_param('s', $sku);
+            $skuStmt->execute();
+            $item = $skuStmt->get_result();
             $price = getPriceFromSKU($conn, $sku, 1);
             if($item->num_rows > 0){
                 $item = $item->fetch_assoc();

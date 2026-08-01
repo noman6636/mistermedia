@@ -1,0 +1,22 @@
+# Uploaded images are stored here. This directory must never execute PHP —
+# if an attacker ever manages to write a .php file here (upload bug, FTP/cPanel
+# credential leak, etc.) this stops it being an RCE.
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+<FilesMatch "\.(php|php\d|phtml|pht|phar|cgi|pl)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if($_SESSION['admin_id'] != 1){
@@ -233,10 +234,10 @@ if($_SESSION['admin_id'] != 1){
                             <form action="" method="GET" style="margin-bottom: 10px;">
                                 <div class="row">
                                     <div class="col-sm-2 col-12" >
-                                        <input type="date" class="form-control" name="frmDate" value="<?php if(isset($_GET['frmDate'])){ echo $_GET['frmDate']; } ?>"  required/>
+                                        <input type="date" class="form-control" name="frmDate" value="<?php if(isset($_GET['frmDate'])){ echo htmlspecialchars($_GET['frmDate'], ENT_QUOTES, 'UTF-8'); } ?>"  required/>
                                     </div>
                                     <div class="col-sm-2 col-12" >
-                                        <input type="date" class="form-control" name="toDate" value="<?php if(isset($_GET['toDate'])){ echo $_GET['toDate']; } ?>" required/>
+                                        <input type="date" class="form-control" name="toDate" value="<?php if(isset($_GET['toDate'])){ echo htmlspecialchars($_GET['toDate'], ENT_QUOTES, 'UTF-8'); } ?>" required/>
                                     </div>
                                     <div class="col-sm-5 col-12">
                                         <input name="filter" value="1" type="hidden">

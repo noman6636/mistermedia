@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -11,6 +12,10 @@ if(!in_array(20, $permissions_allow)){
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Access denied to this page.</div></div>';
     header("location: index.php");
     exit();
+}
+
+if(isset($_GET['edit'])){
+    $_GET['edit'] = (int)$_GET['edit'];
 }
 
 if(isset($_POST['add_supplier'])){
@@ -38,7 +43,7 @@ if(isset($_POST['add_supplier'])){
 }
 
 if(isset($_POST['edit_supplier'])){
-    $editId = $_POST['edit_supplier'];
+    $editId = (int)$_POST['edit_supplier'];
     $name = $conn->real_escape_string($_POST['name']);
     $phone = $conn->real_escape_string($_POST['phone']);
     $email = $conn->real_escape_string($_POST['email']);

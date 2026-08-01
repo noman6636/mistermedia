@@ -8,4 +8,5 @@ addSystemLog($conn, 'LOGOUT', 'User Logged out from System', '');
 session_destroy();
 
 header("Location: login.php");
+    exit();
 ?>

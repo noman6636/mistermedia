@@ -17,7 +17,7 @@ if(isset($_POST['labeltype'])){
     if($labeltype == 100){
         $orderIds = array();
         foreach($aorder as $order){
-            $orderId = strtok($order, '/');
+            $orderId = (int)strtok($order, '/');
             $conn->query("update app_orders set IsArchived = '1' where ID = '$orderId'");
             array_push($orderIds, $orderId);
         }
@@ -38,7 +38,7 @@ if(isset($_POST['labeltype'])){
         $date = date('Y-m-d H:i:s');
         $orderIds = array();
         foreach($aorder as $orderid){
-            $orderid = strtok($orderid, '/');
+            $orderid = (int)strtok($orderid, '/');
             array_push($orderIds, $orderid);
             $order = $conn->query("select * from app_orders where ID = '$orderid'")->fetch_assoc();
             $order_items = $conn->query("select * from app_order_items where OrderID = '{$order['OrderID']}'");
@@ -74,9 +74,10 @@ if(isset($_POST['labeltype'])){
         $ids = '';
         $orderIds = array();
         foreach($aorder as $order){
-            $ids .= strtok($order, '/').',';
-            array_push($orderIds, strtok($order, '/'));
-            
+            $tokenId = (int)strtok($order, '/');
+            $ids .= $tokenId.',';
+            array_push($orderIds, $tokenId);
+
         }
         $ids = rtrim($ids, ',');
         $whereQuery = "WHERE ID IN ($ids)";
@@ -211,7 +212,7 @@ if(isset($_POST['labeltype'])){
    foreach($aorder as $order){
      
        
-       $orderId = strtok($order, '/');
+       $orderId = (int)strtok($order, '/');
        array_push($orderIds, $orderId);
        $order = $conn->query("select * from app_orders where ID = '$orderId'")->fetch_assoc();
        $shipa = json_decode($order['ShippingAddress'], true);

@@ -7,6 +7,10 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
+if (isset($_GET['account_id']) && !in_array($_GET['account_id'], ['all', 'all1', 'all2', 'all4'], true)) {
+    $_GET['account_id'] = (string)(int)$_GET['account_id'];
+}
+
 $account = "Unknown Account"; // Default value
 
 if (isset($_GET['account_id'])) {

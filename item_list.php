@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -20,8 +21,11 @@ if(isset($_POST['deleteEntries'])){
             header("location: item_list.php");
             exit();
         }
+        $deleteStmt = $conn->prepare("update app_items set deleted = '1' where id = ?");
         foreach($case as $delId){
-            $conn->query("update app_items set deleted = '1' where id = '$delId'");
+            $delId = (int)$delId;
+            $deleteStmt->bind_param('i', $delId);
+            $deleteStmt->execute();
         }
         
         $totalItems = count($case);
@@ -236,7 +240,7 @@ if(isset($_POST['deleteEntries'])){
                                 <div class="row">
                                     
                                     <div class="col-sm-6 col-12" >
-                                        <input type="text" class="form-control" name="sku" placeholder="Enter SKU or Name" value="<?php if(isset($_POST['sku'])){ echo $_POST['sku']; } ?>" />
+                                        <input type="text" class="form-control" name="sku" placeholder="Enter SKU or Name" value="<?php if(isset($_POST['sku'])){ echo htmlspecialchars($_POST['sku'], ENT_QUOTES, 'UTF-8'); } ?>" />
                                     </div>
                                     
                                     <div class="col-sm-5 col-12">
@@ -278,7 +282,11 @@ if(isset($_POST['deleteEntries'])){
                                         
                                         if(isset($_POST['sku'])){
                                             $sku = $_POST['sku'];
-                                            $items = $conn->query("select * from app_items WHERE (sku LIKE '%$sku%' || name LIKE '%$sku%') and deleted = 0 order by sku asc");
+                                            $likeSku = '%' . $sku . '%';
+                                            $skuSearchStmt = $conn->prepare("select * from app_items WHERE (sku LIKE ? || name LIKE ?) and deleted = 0 order by sku asc");
+                                            $skuSearchStmt->bind_param('ss', $likeSku, $likeSku);
+                                            $skuSearchStmt->execute();
+                                            $items = $skuSearchStmt->get_result();
                                         }else{
                                             $items = $conn->query("select * from app_items where deleted = 0 order by sku asc");
                                         }

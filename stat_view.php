@@ -1,9 +1,15 @@
-<?php 
+<?php
 require_once "inc/config.php";
 require_once "inc/functions.php";
 $time_start = microtime(true);
 
-
+if(!isset($_SESSION['admin_id'])){
+    header("location: login.php");
+    exit();
+}
+// This dashboard has no dedicated permission id wired up yet — add an
+// in_array($N, $permissions_allow) check here once one is assigned, matching
+// the pattern used by statistics.php.
 
 ?>
 <!DOCTYPE html>

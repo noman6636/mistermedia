@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 if(!in_array(11, $permissions_allow)){
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Access denied to this page.</div></div>';
@@ -43,6 +44,7 @@ if(isset($_POST['generate'])){
 $whereQuery = "WHERE ID <> 0";
     
     if($_POST['AccountID'] != 'all'){
+       $_POST['AccountID'] = (int)$_POST['AccountID'];
        $whereQuery .= " && AccountID = '{$_POST['AccountID']}'";
        $username = $conn->query("select * from app_accounts where id = '{$_POST['AccountID']}'")->fetch_assoc()['account_name'];
        $filename = $username.'_';
@@ -394,10 +396,10 @@ exit;
                                         </select>
                                     </div>
                                     <div class="col-sm-2 col-12" >
-                                        <input type="date" class="form-control" name="frmDate" value="<?php if(isset($_GET['frmDate'])){ echo $_GET['frmDate']; } ?>" required />
+                                        <input type="date" class="form-control" name="frmDate" value="<?php if(isset($_GET['frmDate'])){ echo htmlspecialchars($_GET['frmDate'], ENT_QUOTES, 'UTF-8'); } ?>" required />
                                     </div>
                                     <div class="col-sm-2 col-12" >
-                                        <input type="date" class="form-control" name="toDate" value="<?php if(isset($_GET['toDate'])){ echo $_GET['toDate']; } ?>" required />
+                                        <input type="date" class="form-control" name="toDate" value="<?php if(isset($_GET['toDate'])){ echo htmlspecialchars($_GET['toDate'], ENT_QUOTES, 'UTF-8'); } ?>" required />
                                     </div>
                                     <div class="col-sm-5 col-12">
                                         <input name="generate" value="1" type="hidden">

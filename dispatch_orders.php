@@ -7,6 +7,7 @@ error_reporting(E_ALL);
 if(!isset($_SESSION['admin_id'])){
     $conn->close();
     header("location: login.php");
+        exit();
     exit;
 }
 
@@ -21,11 +22,13 @@ if(isset($_POST['trackingTable'])){
     $order_id = $_POST['order_id'];
     $tracking_id = $_POST['tracking_id'];
     
+    $trackingStmt = $conn->prepare("UPDATE app_orders SET ShipmentTrackingNumber = ?, isTrackingUpload = '0' WHERE OrderID = ?");
     foreach($order_id as $k=>$orderid){
         $tr_id = $tracking_id[$k];
        $orderid =  preg_replace('/[\x00-\x1F\x7F-\xFF]/', '', $orderid);
         $orderid = removeEmoji($conn->real_escape_string($orderid));
-            $conn->query("UPDATE app_orders SET ShipmentTrackingNumber = '$tr_id', isTrackingUpload = '0' WHERE OrderID = '$orderid'");
+            $trackingStmt->bind_param('ss', $tr_id, $orderid);
+            $trackingStmt->execute();
     }
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Tracking has been uploaded in system and will be posted soon on eBay.</div></div>';
     header("location: dispatch_orders.php");
@@ -55,7 +58,10 @@ if(isset($_POST['csvUpload'])){
             while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                 if(!empty($data[0])){
                     $orderNo = $data[0];
-                    $order = $conn->query("SELECT * FROM app_orders WHERE OrderID ='$orderNo' AND ShipmentTrackingNumber IS NULL")->num_rows;
+                    $orderCheckStmt = $conn->prepare("SELECT * FROM app_orders WHERE OrderID = ? AND ShipmentTrackingNumber IS NULL");
+                    $orderCheckStmt->bind_param('s', $orderNo);
+                    $orderCheckStmt->execute();
+                    $order = $orderCheckStmt->get_result()->num_rows;
                     // echo '$order: <pre>' .print_r($order,true). '</pre>'; 
                     if($order == 0){
                         $total_order_not_exists += 1;
@@ -85,7 +91,7 @@ if(isset($_POST['labeltype'])){
     if($_POST['labeltype'] == 100){
         $orderIds = array();
         foreach($case as $order){
-            $orderId = strtok($order, '/');
+            $orderId = (int)strtok($order, '/');
             $conn->query("update app_orders set IsDispatched = '1' where ID = '$orderId'");
             array_push($orderIds, $orderId);
         }

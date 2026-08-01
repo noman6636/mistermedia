@@ -154,57 +154,80 @@ function licensecheck() {
 }
 
 function getTitleFromSKU($conn, $sku) {
-    $items = $conn->query("SELECT * FROM app_items where sku = '{$sku}'");
+    $stmt = $conn->prepare("SELECT * FROM app_items where sku = ?");
+    $stmt->bind_param('s', $sku);
+    $stmt->execute();
+    $items = $stmt->get_result();
     $price = 0;
-    
+
     if ($items->num_rows > 0) {
         $item = $items->fetch_assoc();
         $title = $item["name"];
     } else {
-        $item = $conn->query("SELECT * FROM app_packages where sku = '{$sku}'")->fetch_assoc();
+        $stmt2 = $conn->prepare("SELECT * FROM app_packages where sku = ?");
+        $stmt2->bind_param('s', $sku);
+        $stmt2->execute();
+        $item = $stmt2->get_result()->fetch_assoc();
         $title = $item["name"];
     }
-    
+
     return $title;
 }
 
 function check_add_item($conn, $sku, $name, $price) {
-    $check_item = $conn->query("select * from app_items where sku = '{$sku}'");
-    $check_package = $conn->query("select * from app_packages where sku = '{$sku}'");
-    
+    $checkItemStmt = $conn->prepare("select * from app_items where sku = ?");
+    $checkItemStmt->bind_param('s', $sku);
+    $checkItemStmt->execute();
+    $check_item = $checkItemStmt->get_result();
+
+    $checkPackageStmt = $conn->prepare("select * from app_packages where sku = ?");
+    $checkPackageStmt->bind_param('s', $sku);
+    $checkPackageStmt->execute();
+    $check_package = $checkPackageStmt->get_result();
+
     if ($check_item->num_rows == 0 && $check_package->num_rows == 0) {
-        $conn->query("insert into app_items set sku = '{$sku}', name = '{$name}', price = '{$price}'");
+        $insertStmt = $conn->prepare("insert into app_items set sku = ?, name = ?, price = ?");
+        $insertStmt->bind_param('sss', $sku, $name, $price);
+        $insertStmt->execute();
         $item_id = $conn->insert_id;
-        
+
         $prices_names = $conn->query("select * from app_sellprices_name");
+        $priceInsertStmt = $conn->prepare("insert into app_sellprices_amount set item_id = ?, name_id = ?, price = ?");
         while ($prices_name = $prices_names->fetch_assoc()) {
-            $conn->query("insert into app_sellprices_amount set item_id = '{$item_id}', name_id = '{$prices_name["id"]}', price = '{$price}'");
+            $priceInsertStmt->bind_param('iis', $item_id, $prices_name["id"], $price);
+            $priceInsertStmt->execute();
         }
     }
-    
-    $conn->query("update app_items set deleted = 0 where sku = '{$sku}'");
-    $conn->query("update app_packages set deleted = 0 where sku = '{$sku}'");
+
+    $updateItemsStmt = $conn->prepare("update app_items set deleted = 0 where sku = ?");
+    $updateItemsStmt->bind_param('s', $sku);
+    $updateItemsStmt->execute();
+    $updatePackagesStmt = $conn->prepare("update app_packages set deleted = 0 where sku = ?");
+    $updatePackagesStmt->bind_param('s', $sku);
+    $updatePackagesStmt->execute();
 }
 
 function addSystemLog($conn, $action, $description, $details) {
     $admin_id = (int)$_SESSION["admin_id"];
     $now = date("Y-m-d H:i:s", strtotime(" + 4 hours"));
     $ip_address = get_client_ip();
-    $agent = $_SERVER["HTTP_USER_AGENT"];
+    $agent = $_SERVER["HTTP_USER_AGENT"] ?? '';
     $address = getIPLocation($ip_address);
     $device = get_systemInfo() . " - " . getbrowser();
-    
-    $conn->query("insert into app_systemlogs set 
-        admin_id = '{$admin_id}', 
-        datetime = '{$now}', 
-        action = '{$action}', 
-        description = '{$description}', 
-        details = '{$details}', 
-        ip_address = '{$ip_address}', 
-        address = '{$address}', 
-        device = '{$device}', 
-        agent = '{$agent}'"
+
+    $stmt = $conn->prepare("insert into app_systemlogs set
+        admin_id = ?,
+        datetime = ?,
+        action = ?,
+        description = ?,
+        details = ?,
+        ip_address = ?,
+        address = ?,
+        device = ?,
+        agent = ?"
     );
+    $stmt->bind_param('issssssss', $admin_id, $now, $action, $description, $details, $ip_address, $address, $device, $agent);
+    $stmt->execute();
 }
 
 function getMessageTextFromContent($htmlContent) {
@@ -324,23 +347,42 @@ function begnWith($str, $begnString) {
 }
 
 function getPriceFromSKU($conn, $sku, $name_id) {
-    $items = $conn->query("SELECT * FROM app_items where sku = '{$sku}'");
+    $itemStmt = $conn->prepare("SELECT * FROM app_items where sku = ?");
+    $itemStmt->bind_param('s', $sku);
+    $itemStmt->execute();
+    $items = $itemStmt->get_result();
     $price = 0;
-    
+
     if ($items->num_rows > 0) {
         $item = $items->fetch_assoc();
-        $price = $conn->query("SELECT * FROM app_sellprices_amount WHERE item_id = '{$item["id"]}' && name_id = '{$name_id}' && type = '1'")->fetch_assoc()["price"];
+        $priceStmt = $conn->prepare("SELECT * FROM app_sellprices_amount WHERE item_id = ? && name_id = ? && type = '1'");
+        $priceStmt->bind_param('is', $item["id"], $name_id);
+        $priceStmt->execute();
+        $price = $priceStmt->get_result()->fetch_assoc()["price"];
     } else {
-        $item = $conn->query("SELECT * FROM app_packages where sku = '{$sku}'")->fetch_assoc();
-        $price = $conn->query("SELECT * FROM app_sellprices_amount WHERE item_id = '{$item["id"]}' && name_id = '{$name_id}' && type = '2'")->fetch_assoc()["price"];
+        $packageStmt = $conn->prepare("SELECT * FROM app_packages where sku = ?");
+        $packageStmt->bind_param('s', $sku);
+        $packageStmt->execute();
+        $item = $packageStmt->get_result()->fetch_assoc();
+        $priceStmt = $conn->prepare("SELECT * FROM app_sellprices_amount WHERE item_id = ? && name_id = ? && type = '2'");
+        $priceStmt->bind_param('is', $item["id"], $name_id);
+        $priceStmt->execute();
+        $price = $priceStmt->get_result()->fetch_assoc()["price"];
     }
-    
+
     return $price;
 }
 
 function getIPLocation($ip) {
-    $geolocation = unserialize(file_get_contents("http://www.geoplugin.net/php.gp?ip=" . $ip));
-    return $geolocation["geoplugin_city"] . ", " . $geolocation["geoplugin_countryName"];
+    $response = @file_get_contents("https://www.geoplugin.net/json.gp?ip=" . urlencode($ip));
+    if ($response === false) {
+        return ", ";
+    }
+    $geolocation = json_decode($response, true);
+    if (!is_array($geolocation)) {
+        return ", ";
+    }
+    return ($geolocation["geoplugin_city"] ?? "") . ", " . ($geolocation["geoplugin_countryName"] ?? "");
 }
 
 function htmlToPlainText($str) {

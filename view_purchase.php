@@ -4,10 +4,16 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
+}
+
+if(!in_array(23, $permissions_allow)){
+    header("location: index.php");
+    exit();
 }
 
 if(isset($_GET['id'])){
-    $pid = $_GET['id'];
+    $pid = (int)$_GET['id'];
     $purchase = $conn->query("SELECT * FROM app_purchase where id = '$pid'");
     if($purchase->num_rows > 0){
         $purchase = $purchase->fetch_assoc();

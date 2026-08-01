@@ -5,6 +5,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(5, $permissions_allow)){
@@ -13,10 +14,14 @@ if(!in_array(5, $permissions_allow)){
     exit();
 }
 
+if(isset($_GET['sizeId'])){
+    $_GET['sizeId'] = (int)$_GET['sizeId'];
+}
+
 if(isset($_POST['savesettings'])){
     // print_r($_POST);
-    $pageSettings =  implode(",", array_keys($_POST['page']));
-    $csvSettings =  implode(",", array_keys($_POST['csv']));
+    $pageSettings =  $conn->real_escape_string(implode(",", array_keys($_POST['page'])));
+    $csvSettings =  $conn->real_escape_string(implode(",", array_keys($_POST['csv'])));
     $conn->query("update app_settings set value = '$pageSettings' where name = 'page_settings'");
     $conn->query("update app_settings set value = '$csvSettings' where name = 'csv_settings'");
     
@@ -531,7 +536,7 @@ function confirmArchive(id) {
                                             $showItem = '';
                                             $skuCount = '';
                                             while($item = $itemsList->fetch_assoc()){
-                                                $showItem .= $item['ItemTitle'].' x '.$item['QuantityPurchased'].'<br>';
+                                                $showItem .= htmlspecialchars($item['ItemTitle'], ENT_QUOTES, 'UTF-8').' x '.htmlspecialchars($item['QuantityPurchased'], ENT_QUOTES, 'UTF-8').'<br>';
                                                 $sku .= $item['SKU'].'<br>';
                                                 $skuCount  .= $item['QuantityPurchased']." x ".$item['SKU']." = ";
                                             }
@@ -565,12 +570,12 @@ function confirmArchive(id) {
                                                 <?php if(in_array('CreatedTime', $pageArray)){ ?><td><?php echo date('d/M H:i', strtotime($order['CreatedTime'])); ?></td><?php } ?>
                                                 <?php if(in_array('OrderID', $pageArray)){ ?><td><?php echo $order['OrderID']; ?></td><?php } ?>
                                                 <?php if(in_array('SellingManagerSalesRecordNumber', $pageArray)){ ?><td><?php echo $order['SellingManagerSalesRecordNumber']; ?></td><?php } ?>
-                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo $order['BuyerUserID']; ?></td><?php } ?>
+                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo htmlspecialchars($order['BuyerUserID'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td><?php } ?>
                                                 <?php if(in_array('ItemTitle', $pageArray)){ ?>
                                                 <td>
                                                 <?php echo $showItem; ?>
                                                 <?php if($order['BuyerCheckoutMessage'] !=''){
-                                                    echo '<br><span style="color:red">Buyer Note: '.$order['BuyerCheckoutMessage'].'</span>';
+                                                    echo '<br><span style="color:red">Buyer Note: '.htmlspecialchars($order['BuyerCheckoutMessage'], ENT_QUOTES, 'UTF-8').'</span>';
                                                 }?>
                                                 </td>
                                                 <?php } ?>
@@ -659,7 +664,7 @@ function confirmArchive(id) {
                                             $showItem = '';
                                              $skuCount = '';
                                             while($item = $itemsList->fetch_assoc()){
-                                                $showItem .= $item['ItemTitle'].' x '.$item['QuantityPurchased'].'<br>';
+                                                $showItem .= htmlspecialchars($item['ItemTitle'], ENT_QUOTES, 'UTF-8').' x '.htmlspecialchars($item['QuantityPurchased'], ENT_QUOTES, 'UTF-8').'<br>';
                                                 $sku .= $item['SKU'].'<br>';
                                                 $skuCount  .= $item['QuantityPurchased']." x ".$item['SKU']." = ";
                                             }
@@ -693,12 +698,12 @@ function confirmArchive(id) {
                                                 <?php if(in_array('CreatedTime', $pageArray)){ ?><td><?php echo date('d/M H:i', strtotime($order['CreatedTime'])); ?></td><?php } ?>
                                                 <?php if(in_array('OrderID', $pageArray)){ ?><td><?php echo $order['OrderID']; ?></td><?php } ?>
                                                 <?php if(in_array('SellingManagerSalesRecordNumber', $pageArray)){ ?><td><?php echo $order['SellingManagerSalesRecordNumber']; ?></td><?php } ?>
-                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo $order['BuyerUserID']; ?></td><?php } ?>
+                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo htmlspecialchars($order['BuyerUserID'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td><?php } ?>
                                                 <?php if(in_array('ItemTitle', $pageArray)){ ?>
                                                 <td>
                                                 <?php echo $showItem; ?>
                                                 <?php if($order['BuyerCheckoutMessage'] !=''){
-                                                    echo '<br><span style="color:red">Buyer Note: '.$order['BuyerCheckoutMessage'].'</span>';
+                                                    echo '<br><span style="color:red">Buyer Note: '.htmlspecialchars($order['BuyerCheckoutMessage'], ENT_QUOTES, 'UTF-8').'</span>';
                                                 }?>
                                                 </td>
                                                 <?php } ?>

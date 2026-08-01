@@ -321,7 +321,7 @@ table.dataTable {
                                                 <td>
                                                 <?php echo $showItem; ?>
                                                 <?php if($order['BuyerCheckoutMessage'] !=''){
-                                                    echo '<br><span style="color:red">Buyer Note: '.$order['BuyerCheckoutMessage'].'</span>';
+                                                    echo '<br><span style="color:red">Buyer Note: '.htmlspecialchars($order['BuyerCheckoutMessage'], ENT_QUOTES, 'UTF-8').'</span>';
                                                 }?>
                                                 </td>
                                                 <td><?php echo $order['QuantityPurchased'] ?? 'N/A'; ?></td>

@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(8, $permissions_allow)){
@@ -30,7 +31,7 @@ if(isset($_POST['labeltype'])){
     if($labeltype == 100){
         $orderIds = array();
         foreach($aorder as $order){
-            $orderId = strtok($order, '/');
+            $orderId = (int)strtok($order, '/');
             $conn->query("update app_orders set IsArchived = '1' where ID = '$orderId'");
             array_push($orderIds, $orderId);
         }
@@ -48,7 +49,7 @@ if(isset($_POST['labeltype'])){
         $ids = '';
         $orderIds = array();
         foreach($aorder as $order){
-            $orderId = strtok($order, '/');
+            $orderId = (int)strtok($order, '/');
             if($orderId) {
                 $ids .= $orderId.',';
                 array_push($orderIds, $orderId);
@@ -177,7 +178,7 @@ if(isset($_POST['labeltype'])){
     $orderIds = array();
     
    foreach($aorder as $order){
-       $orderId = strtok($order, '/');
+       $orderId = (int)strtok($order, '/');
        if(!$orderId) continue;
        
        array_push($orderIds, $orderId);

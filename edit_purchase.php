@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -13,32 +14,41 @@ if(!in_array(22, $permissions_allow)){
     exit();
 }
 
+if(isset($_GET['edit'])){
+    $_GET['edit'] = (int)$_GET['edit'];
+}
+
 if(isset($_POST['update_purchase'])){
     $purchase_id = $conn->real_escape_string(trim($_POST['update_purchase']));
     $supplier = $conn->real_escape_string(trim($_POST['supplier']));
     $invoice_no = $conn->real_escape_string(trim($_POST['invoice_no']));
     $date = date('Y-m-d', strtotime($_POST['date']));
-    $total_amount = $_POST['fld_grand_total_amount'];
+    $total_amount = $conn->real_escape_string($_POST['fld_grand_total_amount']);
     $created_date = date('Y-m-d H:i:s');
     $items = $_POST['item'];
     $qtys = $_POST['qty'];
     $prices = $_POST['price'];
     $totals = $_POST['total'];
     $statuss = $_POST['status'];
-    
+
     $pquery = "update app_purchase set supplier_id = '$supplier', invoice_no='$invoice_no', date = '$date', total_amount = '$total_amount' where id = '$purchase_id'";
     if($conn->query($pquery)){
         $conn->query("DELETE FROM app_purchase_detail WHERE purchase_id = '$purchase_id'");
         $conn->query("DELETE FROM app_stocks WHERE pid = '$purchase_id'");
+        $detailStmt = $conn->prepare("insert into app_purchase_detail set purchase_id = ?, item_id = ?, qty = ?, price = ?, total = ?, status = ?");
+        $stockStmt = $conn->prepare("insert into app_stocks set pid = ?, pdid = ?, item_id = ?, description = ?, qty = ?, datetime = ?");
         for ($i = 0, $n = count($items); $i < $n; $i++) {
             if($qtys[$i] > 0){
             $status = $statuss[$i];
-			$conn->query("insert into app_purchase_detail set purchase_id = '$purchase_id', item_id = '{$items[$i]}', qty = '{$qtys[$i]}', price = '{$prices[$i]}', total = '{$totals[$i]}', status = '$status'");
+			$detailStmt->bind_param('ssssss', $purchase_id, $items[$i], $qtys[$i], $prices[$i], $totals[$i], $status);
+			$detailStmt->execute();
 			$pdid = $conn->insert_id;
     			if($status == 1){
-    			    $conn->query("insert into app_stocks set pid = '$purchase_id', pdid = '$pdid', item_id = '{$items[$i]}', description='Stock added from Purchase with invoice no $invoice_no', qty = '{$qtys[$i]}', datetime = '$created_date'");
+    			    $stockDescription = "Stock added from Purchase with invoice no $invoice_no";
+    			    $stockStmt->bind_param('sissss', $purchase_id, $pdid, $items[$i], $stockDescription, $qtys[$i], $created_date);
+    			    $stockStmt->execute();
     			}
-			
+
             }
         }
         addSystemLog($conn, 'PURCHASE UPDATED', "Purchase with id ($purchase_id) has been updated", "");

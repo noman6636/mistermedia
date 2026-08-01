@@ -4,11 +4,12 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
 if(isset($_GET['id'])){
-    $pid = $_GET['id'];
+    $pid = (int)$_GET['id'];
     $purchase = $conn->query("SELECT * FROM app_purchase_orders where id = '$pid'");
     if($purchase->num_rows > 0){
         $purchase = $purchase->fetch_assoc();
@@ -34,19 +35,21 @@ if(isset($_POST['upadte_purchase'])){
     $edit_id = $pid;
     $supplier = $conn->real_escape_string($_POST['supplier']);
     $order_no = $conn->real_escape_string($_POST['order_no']);
-    $total_amount = $_POST['fld_grand_total_amount'];
-    $expected_delivery = $_POST['expected_delivery'];
-    
+    $total_amount = $conn->real_escape_string($_POST['fld_grand_total_amount']);
+    $expected_delivery = $conn->real_escape_string($_POST['expected_delivery']);
+
     $items = $_POST['item'];
     $qtys = $_POST['qty'];
     $prices = $_POST['price'];
     $totals = $_POST['total'];
-    
+
     $pquery = "update app_purchase_orders set order_no = '$order_no', supplier_id = '$supplier', total_amount = '$total_amount', expected_delivery='$expected_delivery' where id = '$edit_id'";
     if($conn->query($pquery)){
         $conn->query("DELETE FROM app_purchase_orders_detail where purchase_id = '$edit_id'");
+        $detailStmt = $conn->prepare("insert into app_purchase_orders_detail set purchase_id = ?, item_id = ?, qty = ?, price = ?, total = ?");
         for ($i = 0, $n = count($items); $i < $n; $i++) {
-			$conn->query("insert into app_purchase_orders_detail set purchase_id = '$edit_id', item_id = '{$items[$i]}', qty = '{$qtys[$i]}', price = '{$prices[$i]}', total = '{$totals[$i]}'");
+			$detailStmt->bind_param('issss', $edit_id, $items[$i], $qtys[$i], $prices[$i], $totals[$i]);
+			$detailStmt->execute();
         }
         addSystemLog($conn, 'PURCHASE ORDER UPDATED', "Purchase Order with number ($order_no) has been updated", "");
         $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Purchase Order updated successfully.</div></div>';

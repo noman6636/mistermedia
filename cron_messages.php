@@ -2,6 +2,7 @@
 require_once "inc/config.php";
 require_once "inc/functions.php";
 
+enforceCronAccess($conn);
 
 function getMsgDetailEbay($conn,$accountRow,$siteID, $verb, $CreateTimeFrom, $CreateTimeTo, $userToken, $AccountID, $devID, $appID, $certID, $serverUrl, $compatabilityLevel, $folder, $messageId){
    
@@ -61,7 +62,8 @@ function getImportMsgEbay($conn,$accountRow,$siteID, $verb, $CreateTimeFrom, $Cr
            }
             foreach($res['Messages']['Message'] as $message){
                 // print_r($message);
-                $check_msg = $conn->query("select * from app_messages where MessageID = '{$message['MessageID']}'");
+                $escapedMessageId = $conn->real_escape_string($message['MessageID']);
+                $check_msg = $conn->query("select * from app_messages where MessageID = '$escapedMessageId'");
                 $blockedSender = array('csfeedback@go.ebay.com', 'eBay');
                     if($check_msg->num_rows == 0 && !in_array($message['Sender'], $blockedSender)){
                         $messageDetail = getMsgDetailEbay($conn, $accountRow, $siteID, $verb, $CreateTimeFrom, $CreateTimeTo, $userToken, $AccountID, $devID, $appID, $certID, $serverUrl, $compatabilityLevel, $folder, $message['MessageID']);
@@ -79,19 +81,30 @@ function getImportMsgEbay($conn,$accountRow,$siteID, $verb, $CreateTimeFrom, $Cr
                             
                            
                             
+                            $msgSender = $conn->real_escape_string($message['Sender']);
+                            $msgSendToName = $conn->real_escape_string($message['SendToName']);
+                            $msgSubject = $conn->real_escape_string($message['Subject']);
+                            $msgMessageId = $conn->real_escape_string($message['MessageID']);
+                            $msgExternalMessageId = $conn->real_escape_string($message['ExternalMessageID']);
+                            $msgText = $conn->real_escape_string($msg);
+                            $msgFolder = $conn->real_escape_string($folder);
+                            $msgMessageType = $conn->real_escape_string($message['MessageType']);
+                            $msgItemId = $conn->real_escape_string($message['ItemID']);
+                            $msgItemTitle = $conn->real_escape_string($message['ItemTitle']);
+
                             $query = "insert into app_messages set ";
                             $query .= "AccountID='$AccountID', ";
-                            $query .= "Sender='{$message['Sender']}', ";
-                            $query .= "SendToName='{$message['SendToName']}', ";
-                            $query .= "Subject='{$message['Subject']}', ";
-                            $query .= "MessageID='{$message['MessageID']}', ";
-                            $query .= "ExternalMessageID='{$message['ExternalMessageID']}', ";
-                            $query .= "Text='$msg', ";
+                            $query .= "Sender='$msgSender', ";
+                            $query .= "SendToName='$msgSendToName', ";
+                            $query .= "Subject='$msgSubject', ";
+                            $query .= "MessageID='$msgMessageId', ";
+                            $query .= "ExternalMessageID='$msgExternalMessageId', ";
+                            $query .= "Text='$msgText', ";
                             $query .= "ReceiveDate='$ReceiveDate', ";
-                            $query .= "Folder='$folder', ";
-                            $query .= "MessageType='{$message['MessageType']}', ";
-                            $query .= "ItemID='{$message['ItemID']}', ";
-                            $query .= "ItemTitle='{$message['ItemTitle']}', ";
+                            $query .= "Folder='$msgFolder', ";
+                            $query .= "MessageType='$msgMessageType', ";
+                            $query .= "ItemID='$msgItemId', ";
+                            $query .= "ItemTitle='$msgItemTitle', ";
                             $query .= "ReadStatus='$Read'";
                             
                             

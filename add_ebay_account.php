@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(1, $permissions_allow)){
@@ -52,8 +53,7 @@ if(isset($_POST['add_account'])){
         exit();
     }
     $now = date('Y-m-d H:i:s');
-    $account_username = $_SESSION['account_username'];
-    $account_username = $_SESSION['account_username'] ?? null;
+    $account_username = $conn->real_escape_string($_SESSION['account_username'] ?? '');
 
     if (!empty($account_username)) {
         $check_uname = $conn->query("select * from app_accounts where account_username = '$account_username'");

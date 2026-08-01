@@ -15,7 +15,8 @@ function __construct() {
         $this->conn = new PDO("mysql:host=$this->host_name2;dbname=$this->dbname", $this->username, $this->password);
         $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     } catch (PDOException $e) {
-        echo 'Error: ' . $e->getMessage();
+        error_log('Database connection failed: ' . $e->getMessage());
+        echo 'Error: Database connection failed.';
     }
 }
 
@@ -24,89 +25,114 @@ function getDatabase()
     return $this->conn;
 }
 
-function customSelect($sql) {
+// Identifiers (table/column names) can't be bound as parameters, so they are
+// restricted to a safe allowlist pattern instead of being escaped/interpolated.
+private function assertSafeIdentifier($name) {
+    if (!is_string($name) || !preg_match('/^[A-Za-z0-9_]+$/', $name)) {
+        throw new InvalidArgumentException('Unsafe SQL identifier: ' . var_export($name, true));
+    }
+    return $name;
+}
+
+// $sql must be a static/trusted string. Bind any dynamic values via $params
+// (positional "?" or named ":name" placeholders), never via string concatenation.
+function customSelect($sql, $params = []) {
     try {
-         $stmt = $this->conn->prepare($sql);
-        $result = $stmt->execute();
-        $rows = $stmt->fetchAll(); // assuming $result == true
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll();
         return $rows;
     } catch (PDOException $e) {
-        echo 'Error: ' . $e->getMessage();
+        error_log('Database::customSelect failed: ' . $e->getMessage());
+        return [];
     }
 }
 
-function select($tbl, $cond='') {
-    $sql = "SELECT * FROM $tbl";
-    if ($cond!='') {
-        $sql .= " WHERE $cond ";
+// $cond, if used, must be a static/trusted WHERE-clause fragment (e.g. a
+// hardcoded string in the calling code) with any dynamic values passed
+// through $condParams as "?" placeholders inside $cond — never interpolate
+// request-derived data directly into $cond.
+function select($tbl, $cond = '', $condParams = []) {
+    $tbl = $this->assertSafeIdentifier($tbl);
+    $sql = "SELECT * FROM `$tbl`";
+    if ($cond != '') {
+        $sql .= " WHERE $cond";
     }
 
     try {
         $stmt = $this->conn->prepare($sql);
-        $result = $stmt->execute();
-        $rows = $stmt->fetchAll(); // assuming $result == true
-        return $rows;
+        $stmt->execute($condParams);
+        return $stmt->fetchAll();
     } catch (PDOException $e) {
-        echo 'Error: ' . $e->getMessage();
+        error_log('Database::select failed: ' . $e->getMessage());
+        return [];
     }
 }
+
 function num_rows($rows){
      $n = count($rows);
      return $n;
 }
 
-function delete($tbl, $cond='') {
+function delete($tbl, $cond = '', $condParams = []) {
+    $tbl = $this->assertSafeIdentifier($tbl);
     $sql = "DELETE FROM `$tbl`";
-    if ($cond!='') {
-        $sql .= " WHERE $cond ";
+    if ($cond != '') {
+        $sql .= " WHERE $cond";
     }
 
     try {
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute();
-        return $stmt->rowCount(); // 1
+        $stmt->execute($condParams);
+        return $stmt->rowCount();
     } catch (PDOException $e) {
+        error_log('Database::delete failed: ' . $e->getMessage());
         return 'Error: ' . $e->getMessage();
     }
 }
 
 function insert($tbl, $arr) {
-    $sql = "INSERT INTO $tbl (`";
-    $key = array_keys($arr);
-    $val = array_values($arr);
-    $sql .= implode("`, `", $key);
-    $sql .= "`) VALUES ('";
-    $sql .= implode("', '", $val);
-    $sql .= "')";
+    $tbl = $this->assertSafeIdentifier($tbl);
+    $cols = array_keys($arr);
+    foreach ($cols as $col) {
+        $this->assertSafeIdentifier($col);
+    }
+    $placeholders = implode(', ', array_fill(0, count($cols), '?'));
+    $sql = "INSERT INTO `$tbl` (`" . implode('`, `', $cols) . "`) VALUES ($placeholders)";
 
-    $sql1="SELECT MAX( id ) FROM  `$tbl`";
     try {
-
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute();
-        $stmt2 = $this->conn->prepare($sql1);
-        $stmt2->execute();
-        $rows = $stmt2->fetchAll(); // assuming $result == true
-        return $rows[0][0];
+        $stmt->execute(array_values($arr));
+        return $this->conn->lastInsertId();
     } catch (PDOException $e) {
+        error_log('Database::insert failed: ' . $e->getMessage());
         return 'Error: ' . $e->getMessage();
     }
 }
 
-function update($tbl, $arr, $cond) {
-    $sql = "UPDATE `$tbl` SET ";
-    $fld = array();
+// $cond, if used, must be a static/trusted WHERE-clause fragment; pass any
+// dynamic values for it via $condParams appended after the SET values.
+function update($tbl, $arr, $cond, $condParams = []) {
+    $tbl = $this->assertSafeIdentifier($tbl);
+    $fld = [];
+    $values = [];
     foreach ($arr as $k => $v) {
-        $fld[] = "`$k` = '$v'";
+        $this->assertSafeIdentifier($k);
+        $fld[] = "`$k` = ?";
+        $values[] = $v;
     }
-    $sql .= implode(", ", $fld);
-    $sql .= " WHERE " . $cond;
+    $sql = "UPDATE `$tbl` SET " . implode(', ', $fld);
+    if ($cond != '') {
+        $sql .= " WHERE " . $cond;
+        $values = array_merge($values, $condParams);
+    }
 
     try {
         $stmt = $this->conn->prepare($sql);
-        $stmt->execute();
-        return $stmt->rowCount(); // 1
+        $stmt->execute($values);
+        return $stmt->rowCount();
     } catch (PDOException $e) {
+        error_log('Database::update failed: ' . $e->getMessage());
         return 'Error: ' . $e->getMessage();
     }
 }

@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -49,23 +50,24 @@ if(isset($_POST['create_package'])){
     
     $price = $_POST['price'];
     $name_id = $_POST['name_id'];
-    
+
     $items = $_POST['item'];
     $qtys = $_POST['qty'];
-    $st = $price[0];
-    
+    $st = $conn->real_escape_string($price[0]);
+
     $pquery = "INSERT INTO app_packages set sku = '$sku', name = '$name', price = '$st', packing_size_id = '$packing_size_id'";
     if($conn->query($pquery)){
         $package_id = $conn->insert_id;
+        $packageItemStmt = $conn->prepare("insert into app_packages_items set package_id = ?, item_id = ?, qty = ?");
         for ($i = 0, $n = count($items); $i < $n; $i++) {
-			$conn->query("insert into app_packages_items set package_id = '$package_id', item_id = '{$items[$i]}', qty = '{$qtys[$i]}'");
+			$packageItemStmt->bind_param('iss', $package_id, $items[$i], $qtys[$i]);
+			$packageItemStmt->execute();
         }
-        
+
+        $priceStmt = $conn->prepare("insert into app_sellprices_amount set item_id = ?, name_id = ?, price = ?, type='2'");
         for ($i = 0, $n = count($price); $i < $n; $i++) {
-           
-                $conn->query("insert into app_sellprices_amount set item_id = '$package_id', name_id = '{$name_id[$i]}', price = '{$price[$i]}', type='2'");
-           
-            
+                $priceStmt->bind_param('iss', $package_id, $name_id[$i], $price[$i]);
+                $priceStmt->execute();
         }
         addSystemLog($conn, 'PACKAGE ADDED', "New Package with SKU ($sku) has been added", "");
         $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Package added successfully.</div></div>';

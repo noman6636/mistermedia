@@ -7,7 +7,6 @@ enforceCronAccess($conn);
 include __DIR__ . '/vendor/autoload.php';
 
 
-
 function getImportOrdersAmazon($conn,$accountRow, $CreateTimeFrom, $CreateTimeTo, $userToken, $AccountID){
        $config = [
         'http' => [
@@ -24,7 +23,7 @@ function getImportOrdersAmazon($conn,$accountRow, $CreateTimeFrom, $CreateTimeTo
         'host' => 'sellingpartnerapi-eu.amazon.com'
       ];
       
-      @unlink(__DIR__ .'/aws-tokens.txt');
+          @unlink(__DIR__ .'/aws-tokens.txt');
       $tokenStorage = new DoubleBreak\Spapi\SimpleTokenStorage(__DIR__ .'/aws-tokens.txt');
     
       $signer = new DoubleBreak\Spapi\Signer();
@@ -75,18 +74,22 @@ function getImportOrdersAmazon($conn,$accountRow, $CreateTimeFrom, $CreateTimeTo
                             if(array_key_exists("PostalCode",$AmzShippingAddress)){ $shippingAddress['PostalCode'] = $AmzShippingAddress['PostalCode'];$postCode=$AmzShippingAddress['PostalCode']; }
                             
                             $ShippingAddress = $conn->real_escape_string(json_encode($shippingAddress));
-                            
+                            $postCode = $conn->real_escape_string($postCode);
+                            $orderStatus = $conn->real_escape_string($order['OrderStatus']);
+                            $orderTotalAmount = $conn->real_escape_string($order['OrderTotal']['Amount']);
+                            $paymentMethod = $conn->real_escape_string($order['PaymentMethod']);
+
                             $query = "insert into app_orders set ";
                             $query .= "AccountID='$AccountID', ";
                             $query .= "OrderID='$OrderID', ";
-                            $query .= "OrderStatus='{$order['OrderStatus']}', ";
+                            $query .= "OrderStatus='$orderStatus', ";
                             $query .= "AdjustmentAmount='0', ";
-                            $query .= "AmountPaid='{$order['OrderTotal']['Amount']}', ";
-                            $query .= "PaymentMethod='{$order['PaymentMethod']}', ";
+                            $query .= "AmountPaid='$orderTotalAmount', ";
+                            $query .= "PaymentMethod='$paymentMethod', ";
                             $query .= "PaymentStatus='Complete', ";
                             $query .= "CreatedTime='$CreatedTime', ";
-                            $query .= "Subtotal='{$order['OrderTotal']['Amount']}', ";
-                            $query .= "Total='{$order['OrderTotal']['Amount']}', ";
+                            $query .= "Subtotal='$orderTotalAmount', ";
+                            $query .= "Total='$orderTotalAmount', ";
                             $query .= "PostCode='$postCode', ";
                             
                             $query .= "SellingManagerSalesRecordNumber='0', ";
@@ -95,14 +98,15 @@ function getImportOrdersAmazon($conn,$accountRow, $CreateTimeFrom, $CreateTimeTo
                             $query .= "ShippingAddress='$ShippingAddress', ";
                             
                             if (array_key_exists("ShipServiceLevel",$order)){
-                                $query .= "ShippingService='{$order['ShipServiceLevel']}', ";
+                                $shipServiceLevel = $conn->real_escape_string($order['ShipServiceLevel']);
+                                $query .= "ShippingService='$shipServiceLevel', ";
                             }
-                            
+
                             $query .= "ShippingServiceCost='0', ";
-                            
+
                             $orderBuyer = $ordersClient->getOrderBuyerInfo($OrderID);
-                            
-                            $query .= "BuyerUserID='{$orderBuyer['payload']['BuyerEmail']}', ";
+                            $buyerEmail = $conn->real_escape_string($orderBuyer['payload']['BuyerEmail']);
+                            $query .= "BuyerUserID='$buyerEmail', ";
                             
                             if(array_key_exists("BuyerCheckoutMessage",$order)){
                                 $check_out_msg  = removeEmoji($conn->real_escape_string($order['BuyerCheckoutMessage']));
@@ -150,12 +154,6 @@ function getImportOrdersAmazon($conn,$accountRow, $CreateTimeFrom, $CreateTimeTo
    
 }
 
-
-
-
-
-  
-
     // 2021-06-11T08:15:30-05:00
     // $CreateTimeFrom = gmdate("Y-m-d\TH:i:s",time()-3600*72).'-05:00';
 $CreateTimeFrom = gmdate("Y-m-d\TH:i:s",time()-3600*36).'-05:00';
@@ -177,5 +175,4 @@ while($accountRow = $getAccounts->fetch_assoc()){
     
     
 }
-
 

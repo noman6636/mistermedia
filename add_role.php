@@ -4,12 +4,21 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if($admin['role_id'] != 1){
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Access denied to this page.</div></div>';
     header("location: index.php");
     exit();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    enforceCsrfOrAbort('add_role.php');
+}
+
+if(isset($_GET['edit'])){
+    $_GET['edit'] = (int)$_GET['edit'];
 }
 
 
@@ -32,7 +41,7 @@ if(isset($_POST['add_role'])){
 }
 
 if(isset($_POST['edit_role'])){
-    $editId = $_POST['edit_role'];
+    $editId = (int)$_POST['edit_role'];
     $name = $conn->real_escape_string($_POST['name']);
     $perm = $conn->real_escape_string(implode(',', $_POST['perm']));
     $check_name = $conn->query("select * from app_roles where name = '$name' && id <> $editId")->num_rows;
@@ -221,6 +230,7 @@ if(isset($_POST['edit_role'])){
                                             ?>
                                             
                                             <form class="" action="" method="post" enctype="multipart/form-data" autocomplete="off">
+                                            <?= csrfInput(); ?>
                                                 <div class="row">
                                                 
                                                     <div class="col-12">
@@ -254,6 +264,7 @@ if(isset($_POST['edit_role'])){
                                             <?php }else{ ?>
                                             
                                             <form class="" action="" method="post" enctype="multipart/form-data" autocomplete="off">
+                                            <?= csrfInput(); ?>
                                                 <div class="row">
                                                 
                                                     <div class="col-12">

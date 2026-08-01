@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(2, $permissions_allow) && !in_array(35, $permissions_allow)){
@@ -13,9 +14,12 @@ if(!in_array(2, $permissions_allow) && !in_array(35, $permissions_allow)){
 }
 
 if(isset($_GET['editid'])){
-    $editid = $_GET['editid'];
-    
-    $account = $conn->query("SELECT * FROM app_accounts WHERE id = '$editid'");
+    $editid = (int)$_GET['editid'];
+
+    $editStmt = $conn->prepare("SELECT * FROM app_accounts WHERE id = ?");
+    $editStmt->bind_param('i', $editid);
+    $editStmt->execute();
+    $account = $editStmt->get_result();
     if($account->num_rows > 0){
         $account = $account->fetch_assoc();
     }else{

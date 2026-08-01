@@ -39,8 +39,14 @@ function requirePermission(array $permissions_allow, int $permissionId) {
  
 if(isset($_POST['editAddress'])){
     $ID = $_POST['editAddress'];
-    $dataO = $conn->query("select * from app_orders where ID = '$ID'")->fetch_assoc();
-    $items = $conn->query("select * from app_order_items where OrderID = '{$dataO['OrderID']}'");
+    $stmt = $conn->prepare("select * from app_orders where ID = ?");
+    $stmt->bind_param('s', $ID);
+    $stmt->execute();
+    $dataO = $stmt->get_result()->fetch_assoc();
+    $itemsStmt = $conn->prepare("select * from app_order_items where OrderID = ?");
+    $itemsStmt->bind_param('s', $dataO['OrderID']);
+    $itemsStmt->execute();
+    $items = $itemsStmt->get_result();
     $data = json_decode($dataO['ShippingAddress'], true);
     
     $html = '';
@@ -124,15 +130,21 @@ echo $html;
 
 if(isset($_POST['transferPayout'])){
     $id = $_POST['transferPayout'];
-    
+
     $type = $_POST['payoutType'];
-    
+
     if($type == 'auto'){
-        $totalPayouts = $conn->query("select SUM(amount) as amount from app_auto_payouts where account_id = '$id'")->fetch_assoc()['amount']+0;
-        
+        $stmt = $conn->prepare("select SUM(amount) as amount from app_auto_payouts where account_id = ?");
+        $stmt->bind_param('s', $id);
+        $stmt->execute();
+        $totalPayouts = $stmt->get_result()->fetch_assoc()['amount']+0;
+
         $options = '<option value="auto" selected>Auto Payouts</option><option value="manual">Manual Payouts</option>';
     }else{
-        $totalPayouts = $conn->query("select SUM(amount) as amount from app_payouts where account_id = '$id'")->fetch_assoc()['amount']+0;
+        $stmt = $conn->prepare("select SUM(amount) as amount from app_payouts where account_id = ?");
+        $stmt->bind_param('s', $id);
+        $stmt->execute();
+        $totalPayouts = $stmt->get_result()->fetch_assoc()['amount']+0;
         $options = '<option value="auto" >Auto Payouts</option><option value="manual" selected>Manual Payouts</option>';
     }
     
@@ -169,10 +181,13 @@ if(isset($_GET['postEditAddress'])){
     $ShippingServiceCost = $_POST['ShippingServiceCost'];
     
     
+    $itemStmt = $conn->prepare("update app_order_items SET SKU = ?, QuantityPurchased = ?, Price = ? WHERE id = ?");
     for($n = 0, $i = count($order_item_id); $n < $i; $n++){
-        $conn->query("update app_order_items SET SKU = '{$SKU[$n]}', QuantityPurchased = '{$QuantityPurchased[$n]}', Price = '{$Price[$n]}' WHERE id = '{$order_item_id[$n]}'");
+        $itemStmt->bind_param('ssss', $SKU[$n], $QuantityPurchased[$n], $Price[$n], $order_item_id[$n]);
+        $itemStmt->execute();
     }
-    
+
+    $postalCode = $_POST['PostalCode'] ?? '';
     unset($_POST['order_item_id']);
     unset($_POST['editId']);
     unset($_POST['SKU']);
@@ -180,7 +195,9 @@ if(isset($_GET['postEditAddress'])){
     unset($_POST['QuantityPurchased']);
     unset($_POST['ShippingServiceCost']);
     $ShippingAddress = json_encode($_POST);
-    $conn->query("update app_orders set ShippingAddress = '$ShippingAddress', PostCode = '{$_POST['PostalCode']}', ShippingServiceCost = '$ShippingServiceCost' where ID = '$editId'");
+    $orderStmt = $conn->prepare("update app_orders set ShippingAddress = ?, PostCode = ?, ShippingServiceCost = ? where ID = ?");
+    $orderStmt->bind_param('sssi', $ShippingAddress, $postalCode, $ShippingServiceCost, $editId);
+    $orderStmt->execute();
     addSystemLog($conn, 'ORDER UPDATED', "Order with id ($editId) has been updated", "$editId");
     $conn->close();
     echo "SUCCESS";
@@ -213,10 +230,13 @@ if(isset($_POST['inhide_reorder'])){
 }
 
 if(isset($_GET['getPrice'])){
-    $sid = $_POST['sid'];
+    $sid = (int)$_POST['sid'];
     $sku = $_POST['item_id'];
     if($sid>0){
-        $name_id = $conn->query("SELECT * FROM app_accounts where id = '$sid'")->fetch_assoc()['price_tag'];
+        $stmt = $conn->prepare("SELECT * FROM app_accounts where id = ?");
+        $stmt->bind_param('i', $sid);
+        $stmt->execute();
+        $name_id = $stmt->get_result()->fetch_assoc()['price_tag'];
     }else{
         $name_id = 1;
     }
@@ -358,19 +378,28 @@ if(isset($_POST['edit_item'])){
         exit();
     }
      $st = $price[0];
-    $conn->query("update app_items set sku = '$sku', name = '$name', price = '$st', description = '$description', item_type='$item_type', reference = '$reference', packing_size_id = '$packing_size_id', stock_threshold='$stock_threshold', order_threshold='$order_threshold' where id = '$editId'");
-    
+    $updateItemStmt = $conn->prepare("update app_items set sku = ?, name = ?, price = ?, description = ?, item_type= ?, reference = ?, packing_size_id = ?, stock_threshold= ?, order_threshold= ? where id = ?");
+    $updateItemStmt->bind_param('sssssssssi', $sku, $name, $st, $description, $item_type, $reference, $packing_size_id, $stock_threshold, $order_threshold, $editId);
+    $updateItemStmt->execute();
+
+    $checkPriceTagStmt = $conn->prepare("select * from app_sellprices_amount where name_id = ? && item_id = ? && type = '1'");
+    $updatePriceStmt = $conn->prepare("update app_sellprices_amount set price = ? where name_id = ? && item_id = ? && type = '1'");
+    $insertPriceStmt = $conn->prepare("insert into app_sellprices_amount set item_id = ?, name_id = ?, price = ?, type = '1'");
     for ($i = 0, $n = count($price); $i < $n; $i++) {
         if(!empty($price[$i])){
-        $check_price_tag = $conn->query("select * from app_sellprices_amount where name_id = '{$name_id[$i]}' && item_id = '$editId' && type = '1'");
+        $checkPriceTagStmt->bind_param('si', $name_id[$i], $editId);
+        $checkPriceTagStmt->execute();
+        $check_price_tag = $checkPriceTagStmt->get_result();
         if($check_price_tag->num_rows > 0){
-            $conn->query("update app_sellprices_amount set price = '{$price[$i]}' where name_id = '{$name_id[$i]}' && item_id = '$editId'  && type = '1'");
-           
+            $updatePriceStmt->bind_param('ssi', $price[$i], $name_id[$i], $editId);
+            $updatePriceStmt->execute();
+
         }else{
-            $conn->query("insert into app_sellprices_amount set item_id = '$editId', name_id = '{$name_id[$i]}', price = '{$price[$i]}', type = '1'");
+            $insertPriceStmt->bind_param('iss', $editId, $name_id[$i], $price[$i]);
+            $insertPriceStmt->execute();
         }
         }
-        
+
     }
     
     if($sku != $old_sku){

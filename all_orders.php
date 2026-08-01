@@ -4,12 +4,20 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(6, $permissions_allow)){
     $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">Access denied to this page.</div></div>';
     header("location: index.php");
     exit();
+}
+
+if(isset($_GET['sizeId'])){
+    $_GET['sizeId'] = (int)$_GET['sizeId'];
+}
+if(isset($_GET['AccountID']) && $_GET['AccountID'] !== 'all'){
+    $_GET['AccountID'] = (string)(int)$_GET['AccountID'];
 }
 
 include("inc/orderActions.php");
@@ -236,10 +244,10 @@ include("inc/orderActions.php");
                                         </select>
                                     </div>
                                     <div class="col-sm-2 col-12" >
-                                        <input type="datetime-local" class="form-control" name="frmDate" value="<?php if(isset($_GET['frmDate'])){ echo $_GET['frmDate']; } ?>" />
+                                        <input type="datetime-local" class="form-control" name="frmDate" value="<?php if(isset($_GET['frmDate'])){ echo htmlspecialchars($_GET['frmDate'], ENT_QUOTES, 'UTF-8'); } ?>" />
                                     </div>
                                     <div class="col-sm-2 col-12" >
-                                        <input type="datetime-local" class="form-control" name="toDate" value="<?php if(isset($_GET['toDate'])){ echo $_GET['toDate']; } ?>" />
+                                        <input type="datetime-local" class="form-control" name="toDate" value="<?php if(isset($_GET['toDate'])){ echo htmlspecialchars($_GET['toDate'], ENT_QUOTES, 'UTF-8'); } ?>" />
                                     </div>
                                     <div class="col-sm-5 col-12">
                                         <input name="filter" value="1" type="hidden">
@@ -410,12 +418,12 @@ include("inc/orderActions.php");
                                                 <?php if(in_array('CreatedTime', $pageArray)){ ?><td><?php echo date('d/M H:i', strtotime($order['CreatedTime'])); ?></td><?php } ?>
                                                 <?php if(in_array('OrderID', $pageArray)){ ?><td><?php echo $order['OrderID']; ?></td><?php } ?>
                                                 <?php if(in_array('SellingManagerSalesRecordNumber', $pageArray)){ ?><td><?php echo $order['SellingManagerSalesRecordNumber']; ?><?php } ?>
-                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo $order['BuyerUserID']; ?></td><?php } ?>
+                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo htmlspecialchars($order['BuyerUserID'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td><?php } ?>
                                                 <?php if(in_array('ItemTitle', $pageArray)){ ?>
                                                 <td>
                                                 <?php echo $showItem; ?>
                                                 <?php if($order['BuyerCheckoutMessage'] !=''){
-                                                    echo '<br><span style="color:red">Buyer Note: '.$order['BuyerCheckoutMessage'].'</span>';
+                                                    echo '<br><span style="color:red">Buyer Note: '.htmlspecialchars($order['BuyerCheckoutMessage'], ENT_QUOTES, 'UTF-8').'</span>';
                                                 }?>
                                                 </td>
                                                 <?php } ?>
@@ -549,12 +557,12 @@ include("inc/orderActions.php");
                                                 <?php if(in_array('CreatedTime', $pageArray)){ ?><td><?php echo date('d/M H:i', strtotime($order['CreatedTime'])); ?></td><?php } ?>
                                                 <?php if(in_array('OrderID', $pageArray)){ ?><td><?php echo $order['OrderID']; ?></td><?php } ?>
                                                 <?php if(in_array('SellingManagerSalesRecordNumber', $pageArray)){ ?><td><?php echo $order['SellingManagerSalesRecordNumber']; ?><?php } ?>
-                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo $order['BuyerUserID']; ?></td><?php } ?>
+                                                <?php if(in_array('BuyerUserID', $pageArray)){ ?><td><?php echo htmlspecialchars($order['BuyerUserID'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td><?php } ?>
                                                 <?php if(in_array('ItemTitle', $pageArray)){ ?>
                                                 <td>
                                                 <?php echo $showItem; ?>
                                                 <?php if($order['BuyerCheckoutMessage'] !=''){
-                                                    echo '<br><span style="color:red">Buyer Note: '.$order['BuyerCheckoutMessage'].'</span>';
+                                                    echo '<br><span style="color:red">Buyer Note: '.htmlspecialchars($order['BuyerCheckoutMessage'], ENT_QUOTES, 'UTF-8').'</span>';
                                                 }?>
                                                 </td>
                                                 <?php } ?>

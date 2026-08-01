@@ -19,7 +19,7 @@ if(!in_array(35, $permissions_allow ?? [])){
 
 // Handle settings save
 if(isset($_POST['savesettings'])){
-    $columnsSettings = isset($_POST['settings']) ? implode(",", array_keys($_POST['settings'])) : '';
+    $columnsSettings = isset($_POST['settings']) ? $conn->real_escape_string(implode(",", array_keys($_POST['settings']))) : '';
     $accounts_columns = isset($_POST['accounts_columns']) ? $conn->real_escape_string($_POST['accounts_columns']) : '';
     
     $conn->query("UPDATE app_settings SET value = '$columnsSettings' WHERE name = 'accounts_columns_settings'");

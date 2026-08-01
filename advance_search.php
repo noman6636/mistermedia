@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 if(!in_array(7, $permissions_allow)){
@@ -327,7 +328,7 @@ include("inc/orderActions.php");
                                                     <div class="col-6">
                                                         <div class="form-group">
                                                             <label for="keywords">Keywords</label>
-                                                            <input type="text" class="form-control" id="keywords" name="value" value="<?php if(isset($_POST['value'])){echo $_POST['value']; } ?>"  placeholder=""/>
+                                                            <input type="text" class="form-control" id="keywords" name="value" value="<?php if(isset($_POST['value'])){echo htmlspecialchars($_POST['value'], ENT_QUOTES, 'UTF-8'); } ?>"  placeholder=""/>
                                                         </div>
                                                     </div>
                                                     
@@ -371,7 +372,7 @@ include("inc/orderActions.php");
                                                         <div class="form-group">
                                                             <label for="account_id">Orders(every order id on new line)</label>
                                                             
-                                                            <textarea class="form-control" name="orderids" rows="4"><?php if(isset($_POST['orderids']))echo $_POST['orderids']; ?></textarea>
+                                                            <textarea class="form-control" name="orderids" rows="4"><?php if(isset($_POST['orderids'])) echo htmlspecialchars($_POST['orderids'], ENT_QUOTES, 'UTF-8'); ?></textarea>
                                                         </div>
                                                     </div>
                                                    
@@ -449,53 +450,68 @@ include("inc/orderActions.php");
                                             </tr>
                                         </thead>
                                         <tbody id="market_1">
-                                        <?php 
+                                        <?php
+                                        // Only these exact column names may ever be interpolated as a SQL
+                                        // identifier below — anything else from $_POST['key'] is rejected.
+                                        $allowedSearchKeys = ['all', 'OrderID', 'ItemID', 'BuyerUserID', 'ItemTitle', 'ShippingAddress', 'ShipmentTrackingNumber', 'SKU', 'Missing_SKU'];
+                                        $orders = false;
                                         if(isset($_POST['search_keyword'])){
                                             $account_id = $_POST['account_id'];
-                                            $key = $_POST['key'];
-                                            $value= trim($_POST['value']);
-                                            if($account_id == 'all'){
-                                                if($key == 'all'){
-                                                    $query = "SELECT * FROM app_orders WHERE (CONCAT(OrderID, BuyerUserID, ShippingAddress, ShipmentTrackingNumber) LIKE '%$value%' || OrderID IN (SELECT OrderID FROM app_order_items WHERE CONCAT(ItemID, SKU, ItemTitle) LIKE '%$value%')) && IsArchived = '0'";
-                                                }else{
-                                                    
-                                                    if($key == 'ItemID' || $key == 'ItemTitle' || $key == 'SKU'){
-                                                        $query = "SELECT * FROM app_orders WHERE OrderID IN (SELECT OrderID FROM app_order_items WHERE $key LIKE '%$value%') && IsArchived = '0'";
-                                                    }elseif($key == 'Missing_SKU'){
-                                                        $query = "SELECT * FROM app_orders WHERE OrderID IN (SELECT OrderID FROM app_order_items WHERE SKU = '') && IsArchived = '0'";
-                                                    }else{
-                                                        $query = "SELECT * FROM app_orders WHERE $key LIKE '%$value%' && IsArchived = '0'";
-                                                    }
-                                                    
-                                                }
+                                            $key = in_array($_POST['key'], $allowedSearchKeys, true) ? $_POST['key'] : 'all';
+                                            $value = trim($_POST['value']);
+                                            $likeValue = '%' . $value . '%';
+
+                                            if($key == 'all'){
+                                                $sql = "SELECT * FROM app_orders WHERE (CONCAT(OrderID, BuyerUserID, ShippingAddress, ShipmentTrackingNumber) LIKE ? || OrderID IN (SELECT OrderID FROM app_order_items WHERE CONCAT(ItemID, SKU, ItemTitle) LIKE ?)) && IsArchived = '0'";
+                                                $types = 'ss';
+                                                $params = [$likeValue, $likeValue];
+                                            }elseif($key == 'ItemID' || $key == 'ItemTitle' || $key == 'SKU'){
+                                                $sql = "SELECT * FROM app_orders WHERE OrderID IN (SELECT OrderID FROM app_order_items WHERE `$key` LIKE ?) && IsArchived = '0'";
+                                                $types = 's';
+                                                $params = [$likeValue];
+                                            }elseif($key == 'Missing_SKU'){
+                                                $sql = "SELECT * FROM app_orders WHERE OrderID IN (SELECT OrderID FROM app_order_items WHERE SKU = '') && IsArchived = '0'";
+                                                $types = '';
+                                                $params = [];
                                             }else{
-                                                if($key == 'all'){
-                                                    $query = "SELECT * FROM app_orders WHERE (CONCAT(OrderID, BuyerUserID, ShippingAddress, ShipmentTrackingNumber) LIKE '%$value%' || OrderID IN (SELECT OrderID FROM app_order_items WHERE CONCAT(ItemID, SKU, ItemTitle) LIKE '%$value%')) && IsArchived = '0' && AccountID = '$account_id'";
-                                                }else{
-                                                    if($key == 'ItemID' || $key == 'ItemTitle' || $key == 'SKU'){
-                                                        $query = "SELECT * FROM app_orders WHERE OrderID IN (SELECT OrderID FROM app_order_items WHERE $key LIKE '%$value%') && IsArchived = '0' && AccountID = '$account_id'";
-                                                    }elseif($key == 'Missing_SKU'){
-                                                        $query = "SELECT * FROM app_orders WHERE OrderID IN (SELECT OrderID FROM app_order_items WHERE SKU = '') && IsArchived = '0'  && AccountID = '$account_id'";
-                                                    }else{
-                                                        $query = "SELECT * FROM app_orders WHERE $key LIKE '%$value%' AND AccountID = '$account_id' && IsArchived = '0'";
-                                                    }
-                                                }
+                                                $sql = "SELECT * FROM app_orders WHERE `$key` LIKE ? && IsArchived = '0'";
+                                                $types = 's';
+                                                $params = [$likeValue];
                                             }
-                                            
+
+                                            if($account_id != 'all'){
+                                                $sql .= " && AccountID = ?";
+                                                $types .= 's';
+                                                $params[] = $account_id;
+                                            }
+
+                                            $stmt = $conn->prepare($sql);
+                                            if($types != ''){
+                                                $stmt->bind_param($types, ...$params);
+                                            }
+                                            $stmt->execute();
+                                            $orders = $stmt->get_result();
+
                                         }elseif(isset($_POST['search_bulk'])){
-                                            $textarea_array = array_map('trim',explode("\n", $_POST['orderids'])); // to remove extra spaces from each value of array
-                                            $query = "SELECT * FROM app_orders WHERE OrderID IN ('".implode('\',\'',$textarea_array)."')";   
+                                            $textarea_array = array_values(array_filter(array_map('trim', explode("\n", $_POST['orderids']))));
+                                            if(count($textarea_array) > 0){
+                                                $placeholders = implode(',', array_fill(0, count($textarea_array), '?'));
+                                                $stmt = $conn->prepare("SELECT * FROM app_orders WHERE OrderID IN ($placeholders)");
+                                                $stmt->bind_param(str_repeat('s', count($textarea_array)), ...$textarea_array);
+                                                $stmt->execute();
+                                                $orders = $stmt->get_result();
+                                            }
                                         }
-                                        $orders = $conn->query($query);
+
                                         $sn = 0;
-                                        while($order = $orders->fetch_assoc()){
+                                        while($orders && ($order = $orders->fetch_assoc())){
                                             $shipa = json_decode($order['ShippingAddress'], true);
                                             $account = $conn->query("SELECT * FROM app_accounts where id = '{$order['AccountID']}'")->fetch_assoc();
                                             $itemsList = $conn->query("SELECT * FROM app_order_items WHERE OrderID = '{$order['OrderID']}'");
                                             $sku = '';
                                             $showItem = '';
                                             while($item = $itemsList->fetch_assoc()){
-                                                $showItem .= $item['ItemTitle'].' x '.$item['QuantityPurchased'].'<br>';
+                                                $showItem .= htmlspecialchars($item['ItemTitle'], ENT_QUOTES, 'UTF-8').' x '.htmlspecialchars($item['QuantityPurchased'], ENT_QUOTES, 'UTF-8').'<br>';
                                                 $sku .= $item['SKU'].'<br>';
                                             }
                                             $sn++; ?>
@@ -504,11 +520,11 @@ include("inc/orderActions.php");
                                                 <td><?php echo date('d/M H:i', strtotime($order['CreatedTime'])); ?></td>
                                                 <td><?php echo $order['OrderID'] ?? 'N/A'; ?></td>
                                                 <td><?php echo $account['account_name'] ?? 'N/A'; ?></td>
-                                                <td><?php echo $order['BuyerUserID'] ?? 'N/A'; ?></td>
+                                                <td><?php echo htmlspecialchars($order['BuyerUserID'] ?? 'N/A', ENT_QUOTES, 'UTF-8'); ?></td>
                                                 <td>
                                                 <?php echo $showItem; ?>
                                                 <?php if($order['BuyerCheckoutMessage'] !=''){
-                                                    echo '<br><span style="color:red">Buyer Note: '.$order['BuyerCheckoutMessage'].'</span>';
+                                                    echo '<br><span style="color:red">Buyer Note: '.htmlspecialchars($order['BuyerCheckoutMessage'], ENT_QUOTES, 'UTF-8').'</span>';
                                                 }?>
                                                 </td>
                                                 <td><?php echo $sku; ?></td>

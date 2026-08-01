@@ -4,6 +4,7 @@ require_once "inc/functions.php";
 
 if(!isset($_SESSION['admin_id'])){
     header("location: login.php");
+        exit();
 }
 
 
@@ -14,6 +15,9 @@ if(!in_array(14, $permissions_allow)){
     exit();
 }
 
+if(isset($_GET['edit'])){
+    $_GET['edit'] = (int)$_GET['edit'];
+}
 
 if(isset($_POST['add_price_tag'])){
     $name = $conn->real_escape_string($_POST['name']);
@@ -127,7 +131,7 @@ if(isset($_POST['add_item'])){
 }
 
 if(isset($_POST['edit_item'])){
-    $editId = $_POST['edit_item'];
+    $editId = (int)$_POST['edit_item'];
     $name = $conn->real_escape_string($_POST['name']);
     $sku = $conn->real_escape_string($_POST['sku']);
     $old_sku = $conn->real_escape_string($_POST['old_sku']);
@@ -150,20 +154,27 @@ if(isset($_POST['edit_item'])){
         header("location: add_item.php?edit=".$editId);
         exit();
     }
-     $st = $price[0];
+     $st = $conn->real_escape_string($price[0]);
     $conn->query("update app_items set sku = '$sku', name = '$name', price = '$st', description = '$description', item_type='$item_type', reference = '$reference', team = '$team', packing_size_id = '$packing_size_id', stock_threshold='$stock_threshold', order_threshold='$order_threshold' where id = '$editId'");
-    
+
+    $checkPriceTagStmt = $conn->prepare("select * from app_sellprices_amount where name_id = ? && item_id = ? && type = '1'");
+    $updatePriceStmt = $conn->prepare("update app_sellprices_amount set price = ? where name_id = ? && item_id = ? && type = '1'");
+    $insertPriceStmt = $conn->prepare("insert into app_sellprices_amount set item_id = ?, name_id = ?, price = ?, type = '1'");
     for ($i = 0, $n = count($price); $i < $n; $i++) {
         if(!empty($price[$i])){
-        $check_price_tag = $conn->query("select * from app_sellprices_amount where name_id = '{$name_id[$i]}' && item_id = '$editId' && type = '1'");
+        $checkPriceTagStmt->bind_param('si', $name_id[$i], $editId);
+        $checkPriceTagStmt->execute();
+        $check_price_tag = $checkPriceTagStmt->get_result();
         if($check_price_tag->num_rows > 0){
-            $conn->query("update app_sellprices_amount set price = '{$price[$i]}' where name_id = '{$name_id[$i]}' && item_id = '$editId'  && type = '1'");
-           
+            $updatePriceStmt->bind_param('ssi', $price[$i], $name_id[$i], $editId);
+            $updatePriceStmt->execute();
+
         }else{
-            $conn->query("insert into app_sellprices_amount set item_id = '$editId', name_id = '{$name_id[$i]}', price = '{$price[$i]}', type = '1'");
+            $insertPriceStmt->bind_param('iss', $editId, $name_id[$i], $price[$i]);
+            $insertPriceStmt->execute();
         }
         }
-        
+
     }
     
     if($sku != $old_sku){
@@ -414,33 +425,33 @@ button.btn {
                                                     <div class="col-12">
                                                         <div class="form-group">
                                                             <label for="name">Item Name</label>
-                                                            <input type="text" class="form-control" id="name" name="name" value="<?=$item['name'];?>" placeholder="Item Name" required/>
+                                                            <input type="text" class="form-control" id="name" name="name" value="<?=htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8');?>" placeholder="Item Name" required/>
                                                         </div>
                                                     </div>
                                                     <div class="col-12">
                                                         <div class="form-group">
                                                             <label for="sku">SKU</label>
-                                                            <input type="text" class="form-control" id="sku" name="sku" value="<?=$item['sku'];?>" placeholder="SKU" required/>
-                                                            <input type="text" class="form-control" id="old_sku" name="old_sku" value="<?=$item['sku'];?>" placeholder="SKU" readonly/>
-                                                            
+                                                            <input type="text" class="form-control" id="sku" name="sku" value="<?=htmlspecialchars($item['sku'], ENT_QUOTES, 'UTF-8');?>" placeholder="SKU" required/>
+                                                            <input type="text" class="form-control" id="old_sku" name="old_sku" value="<?=htmlspecialchars($item['sku'], ENT_QUOTES, 'UTF-8');?>" placeholder="SKU" readonly/>
+
                                                         </div>
                                                     </div>
                                                     <div class="col-lg-6 col-md-12 col-12">
                                                         <div class="form-group">
                                                             <label for="description">Description</label>
-                                                            <input type="text" class="form-control" id="description" name="description" value="<?=$item['description'];?>" placeholder="Description"/>
+                                                            <input type="text" class="form-control" id="description" name="description" value="<?=htmlspecialchars($item['description'], ENT_QUOTES, 'UTF-8');?>" placeholder="Description"/>
                                                         </div>
                                                     </div>
                                                      <div class="col-lg-6 col-md-12 col-12">
                                                         <div class="form-group">
                                                             <label for="reference">Reference</label>
-                                                            <input type="text" class="form-control" id="reference" name="reference" value="<?=$item['reference'];?>" placeholder="Reference"/>
+                                                            <input type="text" class="form-control" id="reference" name="reference" value="<?=htmlspecialchars($item['reference'], ENT_QUOTES, 'UTF-8');?>" placeholder="Reference"/>
                                                         </div>
                                                     </div>
                                                      <div class="col-lg-6 col-md-12 col-12">
                                                         <div class="form-group">
                                                             <label for="reference">Team</label>
-                                                            <input type="text" class="form-control" id="team" name="team" value="<?=$item['team'];?>" placeholder="Team"/>
+                                                            <input type="text" class="form-control" id="team" name="team" value="<?=htmlspecialchars($item['team'], ENT_QUOTES, 'UTF-8');?>" placeholder="Team"/>
                                                         </div>
                                                     </div>
                                                     <div class="col-lg-4 col-md-6 col-12">

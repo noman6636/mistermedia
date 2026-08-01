@@ -15,6 +15,10 @@ if(empty($permissions_allow) || !in_array(22, $permissions_allow)){
     exit();
 }
 
+if(isset($_GET['from_order'])){
+    $_GET['from_order'] = (int)$_GET['from_order'];
+}
+
 if(isset($_POST['create_purchase'])){
     // echo '$_POST: <pre>' .print_r($_POST,true). '</pre>'; die;
     // Validate and sanitize input
