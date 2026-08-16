@@ -207,14 +207,35 @@ function check_add_item($conn, $sku, $name, $price) {
     $updatePackagesStmt->execute();
 }
 
-function addSystemLog($conn, $action, $description, $details) {
-    $admin_id = (int)$_SESSION["admin_id"];
+function addSystemLog($conn, $action, $description, $details, $adminIdOverride = null) {
+    if (!($conn instanceof mysqli)) {
+        return false;
+    }
+    $admin_id = 0;
+    if ($adminIdOverride !== null) {
+        $admin_id = (int)$adminIdOverride;
+    } elseif (isset($_SESSION["admin_id"])) {
+        $admin_id = (int)$_SESSION["admin_id"];
+    }
+    if ($admin_id <= 0) {
+        return false;
+    }
+    $checkStmt = $conn->prepare("SELECT id FROM app_admins WHERE id = ? LIMIT 1");
+    if (!$checkStmt) {
+        return false;
+    }
+    $checkStmt->bind_param('i', $admin_id);
+    $checkStmt->execute();
+    $adminExists = $checkStmt->get_result()->num_rows > 0;
+    $checkStmt->close();
+    if (!$adminExists) {
+        return false;
+    }
     $now = date("Y-m-d H:i:s", strtotime(" + 4 hours"));
     $ip_address = get_client_ip();
     $agent = $_SERVER["HTTP_USER_AGENT"] ?? '';
     $address = getIPLocation($ip_address);
     $device = get_systemInfo() . " - " . getbrowser();
-
     $stmt = $conn->prepare("insert into app_systemlogs set
         admin_id = ?,
         datetime = ?,
@@ -227,7 +248,9 @@ function addSystemLog($conn, $action, $description, $details) {
         agent = ?"
     );
     $stmt->bind_param('issssssss', $admin_id, $now, $action, $description, $details, $ip_address, $address, $device, $agent);
-    $stmt->execute();
+    $result = $stmt->execute();
+    $stmt->close();
+    return $result;
 }
 
 function getMessageTextFromContent($htmlContent) {
@@ -280,9 +303,9 @@ function timeAgo($time_ago) {
 }
 
 function get_systemInfo() {
-    $user_agent = $_SERVER["HTTP_USER_AGENT"];
+    $user_agent = $_SERVER["HTTP_USER_AGENT"] ?? '';
     $os_platform = "Unknown OS Platform";
-    
+ 
     $os_array = array(
         "/windows nt 10.0/i" => "Windows 10",
         "/windows phone 8/i" => "Windows Phone 8",
@@ -310,18 +333,15 @@ function get_systemInfo() {
         "/blackberry/i" => "BlackBerry",
         "/webos/i" => "Mobile"
     );
-    
+ 
     foreach ($os_array as $regex => $value) {
         if (preg_match($regex, $user_agent)) {
             $os_platform = $value;
             break;
         }
     }
-    
-    $device = !preg_match("/(windows|mac|linux|ubuntu)/i", $os_platform) ? '' : 
-             (preg_match("/phone/i", $os_platform) ? '' : '');
-    
-    return "{$device} {$os_platform}";
+ 
+    return trim($os_platform);
 }
 
 function generateRandomString($length) {
@@ -374,17 +394,43 @@ function getPriceFromSKU($conn, $sku, $name_id) {
 }
 
 function getIPLocation($ip) {
-    $response = @file_get_contents("https://www.geoplugin.net/json.gp?ip=" . urlencode($ip));
+    if ($ip === 'UNKNOWN' || $ip === '' || $ip === '127.0.0.1' || $ip === '::1') {
+        return ", ";
+    }
+ 
+    // Cache per-IP within the session so we don't re-query on every single log call
+    if (isset($_SESSION['ip_location_cache'][$ip])) {
+        return $_SESSION['ip_location_cache'][$ip];
+    }
+ 
+    $ch = curl_init("http://ip-api.com/json/" . urlencode($ip) . "?fields=status,city,country");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 3); // keep short - this runs inside a logging function, shouldn't stall the request
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+    $response = curl_exec($ch);
+    $errno = curl_errno($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+ 
     if ($response === false) {
+        error_log("getIPLocation cURL error ($errno): $error for IP $ip");
         return ", ";
     }
+ 
     $geolocation = json_decode($response, true);
-    if (!is_array($geolocation)) {
+    if (!is_array($geolocation) || ($geolocation['status'] ?? '') !== 'success') {
         return ", ";
     }
-    return ($geolocation["geoplugin_city"] ?? "") . ", " . ($geolocation["geoplugin_countryName"] ?? "");
+ 
+    $result = ($geolocation["city"] ?? "") . ", " . ($geolocation["country"] ?? "");
+ 
+    if (!isset($_SESSION)) {
+        // session not started somewhere in the call chain - skip caching, not fatal
+        return $result;
+    }
+    $_SESSION['ip_location_cache'][$ip] = $result;
+    return $result;
 }
-
 function htmlToPlainText($str) {
     $str = str_replace("&nbsp;", " ", $str);
     $str = html_entity_decode($str, ENT_QUOTES | ENT_COMPAT, "UTF-8");
@@ -396,9 +442,9 @@ function htmlToPlainText($str) {
 }
 
 function getbrowser() {
-    $user_agent = $_SERVER["HTTP_USER_AGENT"];
+    $user_agent = $_SERVER["HTTP_USER_AGENT"] ?? '';
     $browser = "Unknown Browser";
-    
+ 
     $browser_array = array(
         "/msie/i" => "Internet Explorer",
         "/firefox/i" => "Firefox",
@@ -410,14 +456,14 @@ function getbrowser() {
         "/konqueror/i" => "Konqueror",
         "/mobile/i" => "Handheld Browser"
     );
-    
+ 
     foreach ($browser_array as $regex => $value) {
         if (preg_match($regex, $user_agent)) {
             $browser = $value;
             break;
         }
     }
-    
+ 
     return $browser;
 }
 
@@ -464,21 +510,30 @@ function getStock($conn, $item_id, $sku) {
 }
 
 function get_client_ip() {
-    if (getenv("HTTP_CLIENT_IP")) {
-        return getenv("HTTP_CLIENT_IP");
-    } elseif (getenv("HTTP_X_FORWARDED_FOR")) {
-        return getenv("HTTP_X_FORWARDED_FOR");
-    } elseif (getenv("HTTP_X_FORWARDED")) {
-        return getenv("HTTP_X_FORWARDED");
-    } elseif (getenv("HTTP_FORWARDED_FOR")) {
-        return getenv("HTTP_FORWARDED_FOR");
-    } elseif (getenv("HTTP_FORWARDED")) {
-        return getenv("HTTP_FORWARDED");
-    } elseif (getenv("REMOTE_ADDR")) {
-        return getenv("REMOTE_ADDR");
+    // Cloudflare - most trustworthy if you're behind CF, since CF sets this itself
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        $ip = trim((string)$_SERVER['HTTP_CF_CONNECTING_IP']);
+        if (filter_var($ip, FILTER_VALIDATE_IP)) {
+            return $ip;
+        }
     }
-    
-    return "UNKNOWN";
+ 
+    // X-Forwarded-For can contain a chain of IPs "client, proxy1, proxy2" - take first valid one
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $forwarded = explode(',', (string)$_SERVER['HTTP_X_FORWARDED_FOR']);
+        foreach ($forwarded as $candidateIp) {
+            $candidateIp = trim($candidateIp);
+            if ($candidateIp !== '' && filter_var($candidateIp, FILTER_VALIDATE_IP)) {
+                return $candidateIp;
+            }
+        }
+    }
+ 
+    if (!empty($_SERVER['HTTP_X_REAL_IP']) && filter_var($_SERVER['HTTP_X_REAL_IP'], FILTER_VALIDATE_IP)) {
+        return trim((string)$_SERVER['HTTP_X_REAL_IP']);
+    }
+ 
+    return $_SERVER['REMOTE_ADDR'] ?? 'UNKNOWN';
 }
 
 // License check at startup
