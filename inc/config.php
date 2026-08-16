@@ -88,7 +88,7 @@ function enforceAuthenticatedSessionIntegrity() {
         return;
     }
 
-    $maxAuthenticatedSessionAge = 3600;
+    $maxAuthenticatedSessionAge = 86400;
     $now = time();
 
     if (!isset($_SESSION['auth_started_at']) || !is_numeric($_SESSION['auth_started_at'])) {
@@ -102,7 +102,7 @@ function enforceAuthenticatedSessionIntegrity() {
     $authStartedAt = (int)$_SESSION['auth_started_at'];
     $lastActivity = (int)$_SESSION['last_activity'];
 
-    // Expire authenticated sessions after 1 hour from login or idle activity.
+    // Expire authenticated sessions after 1 day from login or idle activity.
     if (($now - $authStartedAt) > $maxAuthenticatedSessionAge || ($now - $lastActivity) > $maxAuthenticatedSessionAge) {
         destroyCurrentSession();
         return;
@@ -126,10 +126,22 @@ ini_set('session.use_strict_mode', '1');
 ini_set('session.use_only_cookies', '1');
 ini_set('session.cookie_httponly', '1');
 
+// Custom session save path must be set BEFORE session_start(), otherwise
+// PHP falls back to the hosting's shared system session directory, which
+// gets cleaned up far more aggressively than this app's own settings.
+$sessionPath = '/home/misterme/public_html/sessions';
+if (!file_exists($sessionPath)) {
+    mkdir($sessionPath, 0700, true);
+}
+ini_set('session.save_path', $sessionPath);
+ini_set('session.gc_maxlifetime', 86400);
+ini_set('session.gc_probability', 1);
+ini_set('session.gc_divisor', 1000);
+
 $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
 if (PHP_VERSION_ID >= 70300) {
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => 86400,
         'path' => '/',
         'secure' => $isHttps,
         'httponly' => true,
@@ -157,16 +169,6 @@ ini_set('display_errors', '0');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 set_time_limit(0);
-// Configure custom session save path if needed
-$sessionPath = '/home/misterme/public_html/sessions';
-if (!file_exists($sessionPath)) {
-    mkdir($sessionPath, 0700, true);
-}
-
-// Set session options
-ini_set('session.save_path', $sessionPath);
-ini_set('session.gc_probability', 1);
-
 
 // Set timezone
 date_default_timezone_set('Europe/London');
