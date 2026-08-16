@@ -10,3 +10,4 @@ vendor/
 *.csv
 /error.log
 .well-known
+inc/config.php
