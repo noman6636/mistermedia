@@ -67,6 +67,8 @@ if (isset($_GET['items_csv'])) {
         while ($item = $items->fetch_assoc()) {
             $itemData = array();
             $itemData['SKU'] = $item['sku'] ?? '';
+            $itemData['Team'] = $item['team'] ?? '';
+            $itemData['Reference'] = $item['reference'] ?? '';
 
             $itemId = (int)($item['id'] ?? 0);
             $packingSizeId = (int)($item['packing_size_id'] ?? 0);
