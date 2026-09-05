@@ -15,6 +15,57 @@ if (!isset($permissions_allow) || !in_array(19, $permissions_allow)) {
     exit();
 }
 
+// Handle CSV export
+if (isset($_GET['export_csv'])) {
+    $packagePriceMap = array();
+    $packagePrices = $conn->query("
+        SELECT pi.package_id,
+               ROUND(SUM(pi.qty * IF(sp.name_id = 2, sp.price, 0)), 2) AS vat_price,
+               ROUND(SUM(pi.qty * IF(sp.name_id = 5, sp.price, 0)), 2) AS fba_price
+        FROM app_packages_items pi
+        LEFT JOIN app_sellprices_amount sp ON sp.item_id = pi.item_id AND sp.name_id IN (2, 5)
+        GROUP BY pi.package_id
+    ");
+    if ($packagePrices) {
+        while ($priceRow = $packagePrices->fetch_assoc()) {
+            $packagePriceMap[(int)$priceRow['package_id']] = $priceRow;
+        }
+    }
+
+    $data = array();
+    $packages = $conn->query("select * from app_packages where deleted = '0' order by sku asc");
+    while ($package = $packages->fetch_assoc()) {
+        $packagePrice = $packagePriceMap[(int)$package['id']] ?? ['vat_price' => 0, 'fba_price' => 0];
+
+        $data[] = array(
+            'Package_ID' => $package['id'],
+            'SKU'        => $package['sku'],
+            'Name'       => $package['name'],
+            'FBA_Price'  => $packagePrice['fba_price'],
+            'VAT'        => $packagePrice['vat_price'],
+            'Price'      => $package['price'],
+        );
+    }
+
+    $dateNow = date('Y-m-d H:i:s');
+    addSystemLog($conn, 'CSV DOWNLOAD', "User has been downloaded csv of (PackagesList-$dateNow)", "");
+
+    header('Content-Type: application/csv');
+    header('Content-Disposition: attachment; filename="PackagesList-' . $dateNow . '.csv";');
+    $output = fopen('php://output', 'w');
+
+    $keysPut = 0;
+    foreach ($data as $row) {
+        if ($keysPut == 0) {
+            fputcsv($output, array_keys($row));
+            $keysPut = 1;
+        }
+        fputcsv($output, $row);
+    }
+    fclose($output);
+    exit();
+}
+
 // Handle delete request
 if (isset($_POST['deleteEntries'])) {
     // Safely get case array with null coalescing
@@ -265,6 +316,7 @@ body {
                                     <h4 class="card-title">List of Packages</h4>
                                     <div>
                                         <a class="btn-icon btn btn-primary btn-round btn-sm waves-effect waves-float waves-light" href="create_package.php" ><i data-feather='plus'></i></a>
+                                        <a class="btn-icon btn btn-warning btn-round btn-sm waves-effect waves-float waves-light" href="manage_packages.php?export_csv=1" title="Export CSV"><i data-feather='download'></i></a>
                                         <button type="submit" class="btn-icon btn btn-danger btn-round btn-sm waves-effect waves-float waves-light"><i data-feather='trash-2'></i></button>
                                     </div>
                                     
@@ -276,24 +328,48 @@ body {
                                                 <th style="width:15%"><input type="checkbox" id="selectall"/> Package id</th>
                                                 <th>SKU</th>
                                                 <th>Name</th>
+                                                <th>FBA Price</th>
+                                                <th>VAT</th>
                                                 <th>Price</th>
                                                 <th style="width:12%">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                        <?php 
+                                        <?php
                                         $packages = $conn->query("select * from app_packages where deleted = '0' order by sku asc");
+
+                                        // Packages don't carry FBA/VAT prices directly - derive them from their
+                                        // linked items (app_packages_items) same way statistics.php does (name_id 2 = VAT, 5 = FBA).
+                                        $packagePriceMap = array();
+                                        $packagePrices = $conn->query("
+                                            SELECT pi.package_id,
+                                                   SUM(pi.qty * IF(sp.name_id = 2, sp.price, 0)) AS vat_price,
+                                                   SUM(pi.qty * IF(sp.name_id = 5, sp.price, 0)) AS fba_price
+                                            FROM app_packages_items pi
+                                            LEFT JOIN app_sellprices_amount sp ON sp.item_id = pi.item_id AND sp.name_id IN (2, 5)
+                                            GROUP BY pi.package_id
+                                        ");
+                                        if ($packagePrices) {
+                                            while ($priceRow = $packagePrices->fetch_assoc()) {
+                                                $packagePriceMap[(int)$priceRow['package_id']] = $priceRow;
+                                            }
+                                        }
+
                                         $sn = 0;
-                                        
+
                                         while($package = $packages->fetch_assoc()){
-                                            
-                                            $sn++; ?>
+
+                                            $sn++;
+                                            $packagePrice = $packagePriceMap[(int)$package['id']] ?? ['vat_price' => 0, 'fba_price' => 0];
+                                            ?>
                                     	    <tr>
                                                 <td><input type="checkbox" class="case" name="case[]" value="<?php echo $package['id']; ?>"/> <?php echo $package['id']; ?></td>
                                                 <td><?php echo $package['sku']; ?></td>
                                                 <td><?php echo $package['name']; ?></td>
+                                                <td><?php echo $packagePrice['fba_price']; ?></td>
+                                                <td><?php echo $packagePrice['vat_price']; ?></td>
                                                 <td>£<?php echo $package['price']; ?></td>
-                                               
+
                                                 <td>
                                                     <a type="button" href="view_package.php?id=<?php echo $package['id']; ?>" class="btn btn-primary">View</a>
                                                 </td>
