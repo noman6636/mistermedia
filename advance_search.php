@@ -45,6 +45,105 @@ if(!in_array(7, $permissions_allow)){
 //     exit();
 // }
 
+if(isset($_POST['priceCsvUpload'])){
+    if(!isset($_FILES['priceCsvFile']) || $_FILES['priceCsvFile']['error'] !== UPLOAD_ERR_OK){
+        $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Please choose a valid CSV file to upload.</div></div>';
+        header("location: advance_search.php");
+        exit();
+    }
+
+    $file = $_FILES['priceCsvFile'];
+    $fileExtension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if($fileExtension !== 'csv'){
+        $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Only CSV files are allowed.</div></div>';
+        header("location: advance_search.php");
+        exit();
+    }
+
+    $handle = fopen($file['tmp_name'], 'r');
+    if($handle === FALSE){
+        $_SESSION['flash'] = '<div class="alert alert-danger" role="alert"><div class="alert-body">Unable to open the uploaded CSV file.</div></div>';
+        header("location: advance_search.php");
+        exit();
+    }
+
+    $updated = 0;
+    $unchanged = 0;
+    $notFound = [];
+    $ambiguous = [];
+    $invalidRows = 0;
+
+    $itemLookupStmt = $conn->prepare("SELECT id, Price FROM app_order_items WHERE OrderID = ? AND SKU = ?");
+    $itemUpdateStmt = $conn->prepare("UPDATE app_order_items SET Price = ? WHERE id = ?");
+
+    $rowNum = 0;
+    while(($data = fgetcsv($handle, 2000, ',')) !== FALSE){
+        $rowNum++;
+        $orderId = trim($data[0] ?? '');
+        $sku = trim($data[1] ?? '');
+        $priceRaw = trim($data[2] ?? '');
+
+        if($orderId === '' || $sku === '' || $priceRaw === ''){
+            continue;
+        }
+
+        $orderId = removeEmoji(preg_replace('/[\x00-\x1F\x7F]/', '', $orderId));
+        $sku = removeEmoji(preg_replace('/[\x00-\x1F\x7F]/', '', $sku));
+        $priceRaw = preg_replace('/[^0-9.\-]/', '', $priceRaw);
+
+        if($priceRaw === '' || !is_numeric($priceRaw)){
+            if($rowNum === 1){
+                continue; // header row
+            }
+            $invalidRows++;
+            continue;
+        }
+        $csvPrice = round((float)$priceRaw, 2);
+
+        $itemLookupStmt->bind_param('ss', $orderId, $sku);
+        $itemLookupStmt->execute();
+        $items = $itemLookupStmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+        if(count($items) === 0){
+            $notFound[] = "$orderId / $sku";
+            continue;
+        }
+        if(count($items) > 1){
+            $ambiguous[] = "$orderId / $sku";
+            continue;
+        }
+
+        $currentPrice = round((float)$items[0]['Price'], 2);
+        if(abs($currentPrice - $csvPrice) < 0.005){
+            $unchanged++;
+            continue;
+        }
+
+        $itemUpdateStmt->bind_param('di', $csvPrice, $items[0]['id']);
+        $itemUpdateStmt->execute();
+        addSystemLog($conn, 'ORDER PRICE UPDATED', "Order ($orderId) SKU ($sku) price updated from CSV import: $currentPrice -> $csvPrice", "$orderId");
+        $updated++;
+    }
+    fclose($handle);
+
+    $summary = "CSV import complete. Updated: $updated. Already up to date: $unchanged. Not found: ".count($notFound).". Skipped (duplicate order/SKU rows): ".count($ambiguous).".";
+    if($invalidRows > 0){
+        $summary .= " Invalid rows skipped: $invalidRows.";
+    }
+    if(count($notFound) > 0){
+        $shown = array_slice($notFound, 0, 30);
+        $summary .= '<br><strong>Not found (Order ID / SKU):</strong> '.htmlspecialchars(implode(', ', $shown), ENT_QUOTES, 'UTF-8').(count($notFound) > 30 ? ' ...' : '');
+    }
+    if(count($ambiguous) > 0){
+        $shown = array_slice($ambiguous, 0, 30);
+        $summary .= '<br><strong>Skipped, duplicate rows (Order ID / SKU):</strong> '.htmlspecialchars(implode(', ', $shown), ENT_QUOTES, 'UTF-8').(count($ambiguous) > 30 ? ' ...' : '');
+    }
+
+    $_SESSION['flash'] = '<div class="alert alert-success" role="alert"><div class="alert-body">'.$summary.'</div></div>';
+    header("location: advance_search.php");
+    exit();
+}
+
 include("inc/orderActions.php");
 ?>
 <!DOCTYPE html>
@@ -399,7 +498,43 @@ include("inc/orderActions.php");
                             </div>
                         </div>
                     </div>
-                    
+
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header border-bottom">
+                                    <h4 class="card-title">Import Order Prices (CSV)</h4>
+                                </div>
+                                <div class="card-body">
+                                    <form action="" method="post" enctype="multipart/form-data" autocomplete="off">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label for="priceCsvFile">CSV file (columns: Order ID, SKU, Price)</label>
+                                                    <input type="file" class="form-control" id="priceCsvFile" name="priceCsvFile" accept=".csv" required>
+                                                    <small class="text-muted d-block mb-2">Each row is matched by Order ID + SKU together, so it hits the exact line item even on orders with several products. If the CSV price differs from that item's current price it is updated; if it matches, it is left unchanged. A header row is optional.</small>
+                                                    <small class="text-muted d-block">
+                                                        Example file (make a .csv with your own Order ID / SKU / Price values, in this layout, then choose it above):
+                                                        <pre class="mt-1 mb-0 p-2" style="background:#f8f8f8;border:1px solid #e0e0e0;border-radius:4px;font-size:11px;white-space:pre;overflow-x:auto;">OrderID,SKU,Price
+18-14885-48213,G-6-BRAK,3.10
+19-14883-78886,SFK-23-WSIL,9.60
+17-14887-06838,SFK-16-PODB,5.00</pre>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6 d-flex align-items-end">
+                                                <div class="form-group mb-0">
+                                                    <input type="hidden" name="priceCsvUpload" value="1" />
+                                                    <button type="submit" class="btn btn-primary">Import CSV</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <?php if(isset($_POST['search_keyword']) || isset($_POST['search_bulk'])) { ?>
                     <form action="" id="allordersdata" method="POST">
                         <input id="labeltype" value="0" type="hidden" name="labeltype"; />
