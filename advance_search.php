@@ -512,17 +512,10 @@ include("inc/orderActions.php");
                                                 <div class="form-group">
                                                     <label for="priceCsvFile">CSV file (columns: Order ID, SKU, Price)</label>
                                                     <input type="file" class="form-control" id="priceCsvFile" name="priceCsvFile" accept=".csv" required>
-                                                    <small class="text-muted d-block mb-2">Each row is matched by Order ID + SKU together, so it hits the exact line item even on orders with several products. If the CSV price differs from that item's current price it is updated; if it matches, it is left unchanged. A header row is optional.</small>
-                                                    <small class="text-muted d-block">
-                                                        Example file (make a .csv with your own Order ID / SKU / Price values, in this layout, then choose it above):
-                                                        <pre class="mt-1 mb-0 p-2" style="background:#f8f8f8;border:1px solid #e0e0e0;border-radius:4px;font-size:11px;white-space:pre;overflow-x:auto;">OrderID,SKU,Price
-18-14885-48213,G-6-BRAK,3.10
-19-14883-78886,SFK-23-WSIL,9.60
-17-14887-06838,SFK-16-PODB,5.00</pre>
-                                                    </small>
+                                                   
                                                 </div>
                                             </div>
-                                            <div class="col-md-6 d-flex align-items-end">
+                                            <div class="col-md-6 d-flex align-items-center">
                                                 <div class="form-group mb-0">
                                                     <input type="hidden" name="priceCsvUpload" value="1" />
                                                     <button type="submit" class="btn btn-primary">Import CSV</button>
