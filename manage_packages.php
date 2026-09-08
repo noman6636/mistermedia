@@ -19,12 +19,12 @@ if (!isset($permissions_allow) || !in_array(19, $permissions_allow)) {
 if (isset($_GET['export_csv'])) {
     $packagePriceMap = array();
     $packagePrices = $conn->query("
-        SELECT pi.package_id,
-               ROUND(SUM(pi.qty * IF(sp.name_id = 2, sp.price, 0)), 2) AS vat_price,
-               ROUND(SUM(pi.qty * IF(sp.name_id = 5, sp.price, 0)), 2) AS fba_price
-        FROM app_packages_items pi
-        LEFT JOIN app_sellprices_amount sp ON sp.item_id = pi.item_id AND sp.name_id IN (2, 5)
-        GROUP BY pi.package_id
+        SELECT sp.item_id AS package_id,
+               ROUND(SUM(IF(sp.name_id = 2, sp.price, 0)), 2) AS vat_price,
+               ROUND(SUM(IF(sp.name_id = 5, sp.price, 0)), 2) AS fba_price
+        FROM app_sellprices_amount sp
+        WHERE sp.type = '2' AND sp.name_id IN (2, 5)
+        GROUP BY sp.item_id
     ");
     if ($packagePrices) {
         while ($priceRow = $packagePrices->fetch_assoc()) {
@@ -338,16 +338,17 @@ body {
                                         <?php
                                         $packages = $conn->query("select * from app_packages where deleted = '0' order by sku asc");
 
-                                        // Packages don't carry FBA/VAT prices directly - derive them from their
-                                        // linked items (app_packages_items) same way statistics.php does (name_id 2 = VAT, 5 = FBA).
+                                        // Show the package's own FBA/VAT prices as defined on the package
+                                        // (app_sellprices_amount type = '2', name_id 2 = VAT, 5 = FBA) - same values
+                                        // shown when viewing a single package. No statistics/derived totals here.
                                         $packagePriceMap = array();
                                         $packagePrices = $conn->query("
-                                            SELECT pi.package_id,
-                                                   SUM(pi.qty * IF(sp.name_id = 2, sp.price, 0)) AS vat_price,
-                                                   SUM(pi.qty * IF(sp.name_id = 5, sp.price, 0)) AS fba_price
-                                            FROM app_packages_items pi
-                                            LEFT JOIN app_sellprices_amount sp ON sp.item_id = pi.item_id AND sp.name_id IN (2, 5)
-                                            GROUP BY pi.package_id
+                                            SELECT sp.item_id AS package_id,
+                                                   SUM(IF(sp.name_id = 2, sp.price, 0)) AS vat_price,
+                                                   SUM(IF(sp.name_id = 5, sp.price, 0)) AS fba_price
+                                            FROM app_sellprices_amount sp
+                                            WHERE sp.type = '2' AND sp.name_id IN (2, 5)
+                                            GROUP BY sp.item_id
                                         ");
                                         if ($packagePrices) {
                                             while ($priceRow = $packagePrices->fetch_assoc()) {
