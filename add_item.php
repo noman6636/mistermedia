@@ -516,8 +516,13 @@ button.btn {
                                                         <div class="row">
                                                             <?php 
                                                             $prices = $conn->query("select * from app_sellprices_name order by id asc");
-                                                            while($price = $prices->fetch_assoc()){ 
-                                                            $cprice = $conn->query("Select * from app_sellprices_amount where item_id = '{$_GET['edit']}' && name_id = '{$price['id']}' && type = '1'")->fetch_assoc()['price']+0;
+                                                            while($price = $prices->fetch_assoc()){
+                                                            if($price['id']==8){
+                                                                $lastPurchase = $conn->query("select pd.price from app_purchase_detail pd inner join app_purchase p on p.id = pd.purchase_id where pd.item_id = '{$_GET['edit']}' order by p.date desc, pd.id desc limit 1")->fetch_assoc();
+                                                                $cprice = $lastPurchase['price']+0;
+                                                            }else{
+                                                                $cprice = $conn->query("Select * from app_sellprices_amount where item_id = '{$_GET['edit']}' && name_id = '{$price['id']}' && type = '1'")->fetch_assoc()['price']+0;
+                                                            }
                                                             ?>
                                                             <div class="col-lg-6 col-md-12 col-12">
                                                                 <div class="form-group">
