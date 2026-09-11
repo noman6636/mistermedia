@@ -154,6 +154,7 @@ function licensecheck() {
 }
 
 function getTitleFromSKU($conn, $sku) {
+    $sku = $sku ?? '';
     $stmt = $conn->prepare("SELECT * FROM app_items where sku = ?");
     $stmt->bind_param('s', $sku);
     $stmt->execute();
@@ -175,6 +176,7 @@ function getTitleFromSKU($conn, $sku) {
 }
 
 function check_add_item($conn, $sku, $name, $price) {
+    $sku = $sku ?? '';
     $checkItemStmt = $conn->prepare("select * from app_items where sku = ?");
     $checkItemStmt->bind_param('s', $sku);
     $checkItemStmt->execute();
@@ -357,7 +359,7 @@ function generateRandomString($length) {
 }
 
 function IsSKUBanned($sku) {
-    $sku = trim(strtoupper($sku));
+    $sku = trim(strtoupper($sku ?? ''));
     return (begnWith($sku, "PVT") || begnWith($sku, "PRIVATE") || begnWith($sku, "(PVT)"));
 }
 
@@ -367,6 +369,7 @@ function begnWith($str, $begnString) {
 }
 
 function getPriceFromSKU($conn, $sku, $name_id) {
+    $sku = $sku ?? '';
     $itemStmt = $conn->prepare("SELECT * FROM app_items where sku = ?");
     $itemStmt->bind_param('s', $sku);
     $itemStmt->execute();
