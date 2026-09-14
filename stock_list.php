@@ -336,7 +336,9 @@ body {
                 });
             }
         })
-        $(".dt-row-grouping-t").DataTable();
+        $(".dt-row-grouping-t").DataTable({
+            lengthMenu: [[10, 25, 50, 100, 500, -1], [10, 25, 50, 100, 500, "All"]]
+        });
         $("#selectall").click(function () {
                 var checkAll = $("#selectall").prop('checked');
                     if (checkAll) {
