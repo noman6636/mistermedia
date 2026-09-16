@@ -515,7 +515,7 @@ button.btn {
                                                     <div class="col-lg-6 col-md-12 col-12">
                                                         <div class="row">
                                                             <?php 
-                                                            $prices = $conn->query("select * from app_sellprices_name order by id asc");
+                                                            $prices = $conn->query("select * from app_sellprices_name where TRIM(name) not in ('Jaasim Price', 'Jasim Price', 'Wholesale Price VAT', 'remote-sam', 'H-Invoice', 'amz price', 'Salman', 'Saiman', '9999999999', 'test', 'hasnat') order by id asc");
                                                             while($price = $prices->fetch_assoc()){
                                                             $cprice = $conn->query("Select * from app_sellprices_amount where item_id = '{$_GET['edit']}' && name_id = '{$price['id']}' && type = '1'")->fetch_assoc()['price']+0;
                                                             ?>
@@ -629,7 +629,7 @@ button.btn {
                                                     <div class="col-lg-6 col-md-12 col-12">
                                                         <div class="row">
                                                             <?php 
-                                                            $prices = $conn->query("select * from app_sellprices_name order by id asc");
+                                                            $prices = $conn->query("select * from app_sellprices_name where TRIM(name) not in ('Jaasim Price', 'Jasim Price', 'Wholesale Price VAT', 'remote-sam', 'H-Invoice', 'amz price', 'Salman', 'Saiman', '9999999999', 'test', 'hasnat') order by id asc");
                                                             while($price = $prices->fetch_assoc()){ ?>
                                                             <div class="col-lg-6 col-md-12 col-12">
                                                                 <div class="form-group">
