@@ -169,7 +169,7 @@ if($check_sku_item && $check_sku_item->num_rows > 0){
                                                                     $price_values[$price_amount['name_id']] = $price_amount['price'] + 0;
                                                                 }
                                                             }
-                                                            $prices = $conn->query("select * from app_sellprices_name order by id asc");
+                                                            $prices = $conn->query("select * from app_sellprices_name where TRIM(name) not in ('Jaasim Price', 'Jasim Price', 'Wholesale Price VAT', 'remote-sam', 'H-Invoice', 'amz price', 'Salman', 'Saiman', '9999999999', 'ggggggggggg', 'test', 'hasnat') order by id asc");
                                                             while($price = $prices->fetch_assoc()){ 
                                                             $cprice = isset($price_values[$price['id']]) ? ($price_values[$price['id']] + 0) : 0;
                                                             ?>
