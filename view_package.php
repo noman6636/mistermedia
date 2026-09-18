@@ -232,7 +232,7 @@ if(isset($_POST['update_package'])){
                                                 <div class="col-6">
                                                     <div class="row">
                                                             <?php 
-                                                            $prices = $conn->query("select * from app_sellprices_name order by id asc");
+                                                            $prices = $conn->query("select * from app_sellprices_name where TRIM(name) not in ('Jaasim Price', 'Jasim Price', 'Wholesale Price VAT', 'remote-sam', 'H-Invoice', 'amz price', 'Salman', 'Saiman', '9999999999', 'ggggggggggg', 'test', 'hasnat') order by id asc");
                                                             while($price = $prices->fetch_assoc()){ 
                                                             $cprice = $conn->query("Select * from app_sellprices_amount where item_id = '{$package['id']}' && name_id = '{$price['id']}' && type='2'")->fetch_assoc()['price']+0;
                                                             ?>
